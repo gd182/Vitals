@@ -13,12 +13,19 @@ struct DashboardView: View {
     @ObservedObject var config: DashboardConfig
     @State private var showingSettingsFor: BlockContent? = nil
     @State private var isEditing: Bool = false
+    @Environment(\.openSettings) var openSettings
     
     var body: some View {
         VStack {
-            // Кнопка редактирования
             HStack {
                 Spacer()
+                Button {
+                    NSApp.activate(ignoringOtherApps: true)
+                    openSettings()
+                } label: {
+                    Image(systemName: "gearshape")
+                }
+                .buttonStyle(.plain)
                 Button { isEditing.toggle() } label: {
                     Image(systemName: isEditing ? "checkmark" : "pencil")
                 }
@@ -26,7 +33,6 @@ struct DashboardView: View {
             }
             .padding(10)
 
-            // Блоки
             VStack {
                 ForEach(config.order, id: \.self) { id in
                     if let block = blocks.first(where: { $0.id == id }) {
@@ -40,10 +46,12 @@ struct DashboardView: View {
                                         ))
                                         .toggleStyle(.switch)
                                     Spacer()
-                                    Button("↑") { config.moveUp(id: id) }
-                                    Button("↓") { config.moveDown(id: id) }
+                                    Button { config.moveUp(id: id) } label: { Image(systemName: "chevron.up") }
+                                    Button { config.moveDown(id: id) } label: { Image(systemName: "chevron.down") }
                                     if block.hasSettings {
-                                        Button("⚙") { showingSettingsFor = block.content }
+                                        Button { showingSettingsFor = block.content } label: {
+                                                Image(systemName: "gear")
+                                            }
                                             .popover(isPresented: Binding(
                                                 get: { showingSettingsFor?.id == block.content.id },
                                                 set: { if !$0 { showingSettingsFor = nil } }
@@ -61,9 +69,6 @@ struct DashboardView: View {
                     }
                 }
             }
-        }
-        .popover(item: $showingSettingsFor) { content in
-            settingsView(for: content)
         }
     }
     

@@ -5,22 +5,22 @@ struct SettingsView: View {
         TabView {
             GeneralSettingsView()
                 .tabItem {
-                    Label("Основное", systemImage: "gearshape")
+                    Label("settings_tab_general", systemImage: "gearshape")
                 }
             
             ThresholdsSettingsView()
                 .tabItem {
-                    Label("Пороги", systemImage: "chart.bar")
+                    Label("settings_tab_thresholds", systemImage: "chart.bar")
                 }
             
             AppearanceSettingsView()
                 .tabItem {
-                    Label("Внешний вид", systemImage: "paintbrush")
+                    Label("settings_tab_appearance", systemImage: "paintbrush")
                 }
             
             MenuBarSettingsView()
                 .tabItem {
-                    Label("Меню бар", systemImage: "menubar.rectangle")
+                    Label("settings_tab_menubar", systemImage: "menubar.rectangle")
                 }
         }
         .frame(width: 400, height: 300)

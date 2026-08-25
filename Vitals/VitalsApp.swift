@@ -14,7 +14,10 @@ struct VitalsApp: App {
         //.menuBarExtraStyle(.window)
         
         Settings {
-            SettingsView()
+            LocalizedRoot(langManager: appDelegate.langManager) {
+                SettingsView()
+                    .environmentObject(appDelegate.langManager)
+            }
         }
     }
 }

@@ -9,7 +9,7 @@ import SwiftUI
 
 struct DashboardBlock: Identifiable {
     let id: String
-    let title: String
+    let title: LocalizedStringKey
     let content: BlockContent
-    var hasSettings: Bool  // просто флаг
+    var hasSettings: Bool
 }

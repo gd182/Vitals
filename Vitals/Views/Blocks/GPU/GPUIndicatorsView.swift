@@ -15,19 +15,19 @@ struct GPUIndicatorsView: View {
             CircularIndicator(
                 value: Double(vm.gpuRenderUtilization),
                 text: String(format: "%.0f%%", vm.gpuRenderUtilization),
-                label: "GPU рендеринг"
+                label: "gpu_label_render"
             )
             .padding()
             CircularIndicator(
                 value: Double(vm.gpuUtilization),
                 text: String(format: "%.0f%%", vm.gpuUtilization),
-                label: "GPU загрузка"
+                label: "gpu_label_util"
             )
             .padding()
             CircularIndicator(
                 value: Double(vm.gpuTilerUtilization),
                 text: String(format: "%.0f%%", vm.gpuTilerUtilization),
-                label: "GPU tiler"
+                label: "gpu_label_tiler"
             )
             .padding()
         }

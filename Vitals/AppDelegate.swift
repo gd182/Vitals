@@ -16,9 +16,16 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     var popoverCPU = NSPopover()
     var popoverRAM = NSPopover()
     var popoverGPU = NSPopover()
+
+    var langManager = LanguageManager()
     
     func applicationDidFinishLaunching(_ aNotification: Notification) {
-        popoverCPU.contentViewController = NSHostingController(rootView: CPUView().environmentObject(vm))
+        NSApp.setActivationPolicy(.accessory)
+        popoverCPU.contentViewController = NSHostingController(rootView:
+                LocalizedRoot(langManager: langManager) {
+                CPUView().environmentObject(self.vm).environmentObject(self.langManager)
+                }
+            )
         popoverCPU.contentSize = NSSize(width: 250, height: 250)
         popoverCPU.behavior = .transient
         statusItemCPU = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
@@ -29,7 +36,11 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         statusItemCPU?.button?.action = #selector(toggleCPUPopover)
         statusItemCPU?.button?.target = self
         
-        popoverRAM.contentViewController = NSHostingController(rootView: RAMView().environmentObject(vm))
+        popoverRAM.contentViewController = NSHostingController(rootView:
+                LocalizedRoot(langManager: langManager) {
+            RAMView().environmentObject(self.vm).environmentObject(self.langManager)
+                }
+            )
         popoverRAM.contentSize = NSSize(width: 250, height: 250)
         popoverRAM.behavior = .transient
         statusItemRAM = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
@@ -40,7 +51,11 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         statusItemRAM?.button?.action = #selector(toggleRAMPopover)
         statusItemRAM?.button?.target = self
         
-        popoverGPU.contentViewController = NSHostingController(rootView: GPUView().environmentObject(vm))
+        popoverGPU.contentViewController = NSHostingController(rootView:
+                LocalizedRoot(langManager: langManager) {
+            GPUView().environmentObject(self.vm).environmentObject(self.langManager)
+                }
+            )
         popoverGPU.contentSize = NSSize(width: 250, height: 250)
         popoverGPU.behavior = .transient
         statusItemGPU = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)

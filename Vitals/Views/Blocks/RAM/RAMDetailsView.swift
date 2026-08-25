@@ -12,9 +12,21 @@ struct RAMDetailsView: View {
     
     var body: some View {
         VStack(alignment: .leading) {
-            Text("Занято: \(Format.formatBytes(vm.memoryUsedBytes))")
-            Text("Свободно: \(Format.formatBytes(vm.memoryTotalBytes - vm.memoryUsedBytes))")
-            Text("Всего: \(Format.formatBytes(vm.memoryTotalBytes))")
+            HStack {
+                Text("memory_used")
+                Spacer()
+                Text(Format.formatBytes(vm.memoryUsedBytes))
+            }
+            HStack {
+                Text("memory_free")
+                Spacer()
+                Text(Format.formatBytes(vm.memoryTotalBytes - vm.memoryUsedBytes))
+            }
+            HStack {
+                Text("memory_total")
+                Spacer()
+                Text(Format.formatBytes(vm.memoryTotalBytes))
+            }
         }
         .font(.caption)
         .padding(10)

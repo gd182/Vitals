@@ -35,6 +35,7 @@ Carthage/Build/
 ._*
 .Spotlight-V100
 .Trashes
+Thumbs.db
 
 # Xcode auto-generated
 *.moved-aside

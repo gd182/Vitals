@@ -6,10 +6,10 @@ struct CPUView: View {
     @StateObject var config = DashboardConfig(namespace: "CPU")
     
     let blocks: [DashboardBlock] = [
-        DashboardBlock(id: "cpu_indicators", title: "Индикаторы", content: .cpuIndicators, hasSettings: false),
-        DashboardBlock(id: "cpu_details", title: "Детали CPU", content: .cpuDetails, hasSettings: false),
-        DashboardBlock(id: "cpu_chart", title: "График", content: .cpuChart(namespace: "chart_CPU"), hasSettings: true),
-        DashboardBlock(id: "cpu_processes", title: "Процессы", content: .cpuProcesses, hasSettings: false),
+        DashboardBlock(id: "cpu_indicators", title: "block_indicators", content: .cpuIndicators, hasSettings: false),
+        DashboardBlock(id: "cpu_details", title: "block_details_cpu", content: .cpuDetails, hasSettings: false),
+        DashboardBlock(id: "cpu_chart", title: "block_chart", content: .cpuChart(namespace: "chart_CPU"), hasSettings: true),
+        DashboardBlock(id: "cpu_processes", title: "block_processes", content: .cpuProcesses, hasSettings: false),
     ]
     
     var body: some View {

@@ -12,14 +12,26 @@ struct GPUDetailsView: View {
     
     var body: some View {
         VStack(alignment: .leading) {
-            Text("Занято: \(Format.formatBytes(vm.gpuVramUsed))")
+            HStack {
+                Text("memory_used")
+                Spacer()
+                Text(Format.formatBytes(vm.gpuVramUsed))
+            }
             #if !arch(arm64)
             let free = vm.gpuVramTotal > vm.gpuVramUsed
                 ? vm.gpuVramTotal - vm.gpuVramUsed
                 : 0
-            Text("Свободно: \(Format.formatBytes(free))")
+            HStack {
+                Text("memory_free")
+                Spacer()
+                Text(Format.formatBytes(free))
+            }
             #endif
-            Text("Всего: \(Format.formatBytes(vm.gpuVramTotal))")
+            HStack {
+                Text("memory_total")
+                Spacer()
+                Text(Format.formatBytes(vm.gpuVramTotal))
+            }
         }
         .font(.caption)
         .padding(10)

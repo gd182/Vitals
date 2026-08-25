@@ -1,7 +1,7 @@
 <h1 align="center">Vitals</h1>
 
 <p align="center">
-  Легкий монитор CPU, GPU и RAM для строки меню macOS, созданный на C++ и SwiftUI
+  Легкий монитор CPU, GPU и RAM для строки меню macOS, созданный на C++ и SwiftUI. Поддерживает английский, русский и немецкий язык с переключением без перезапуска.
 </p>
 
 ###
@@ -50,7 +50,7 @@ Vitals разделен на три слоя:
 
 ## Требования
 
-- macOS 13 Ventura или новее
+- macOS 14 Sonoma или новее
 - Xcode 15+
 - Apple Silicon или Intel Mac
 

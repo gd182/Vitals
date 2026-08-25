@@ -24,22 +24,22 @@ struct ChartSettingsView: View {
     var body: some View {
         VStack(spacing: 8) {
             HStack {
-                Text("Толщина линии").frame(maxWidth: .infinity, alignment: .leading)
+                Text("chart_line_width").frame(maxWidth: .infinity, alignment: .leading)
                 Slider(value: $lineWidth, in: 0.5...4, step: 0.5)
                     .frame(width: 120)
                 Text(String(format: "%.1f", lineWidth)).frame(width: 30)
             }
             HStack {
-                Text("Высота").frame(maxWidth: .infinity, alignment: .leading)
+                Text("chart_height").frame(maxWidth: .infinity, alignment: .leading)
                 Slider(value: $height, in: 30...120, step: 10)
                     .frame(width: 120)
-                Text("\(Int(height))").frame(width: 30)
+                Text(verbatim: "\(Int(height))").frame(width: 30)
             }
             HStack {
-                Text("Переход").frame(maxWidth: .infinity, alignment: .leading)
+                Text("chart_transition").frame(maxWidth: .infinity, alignment: .leading)
                 Slider(value: $transitionWidth, in: 0...50, step: 5)
                     .frame(width: 120)
-                Text("\(Int(transitionWidth))").frame(width: 30)
+                Text(verbatim: "\(Int(transitionWidth))").frame(width: 30)
             }
         }
         .padding()

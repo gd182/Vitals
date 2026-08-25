@@ -12,7 +12,7 @@ struct RAMProcessesView: View {
     
     var body: some View {
         VStack {
-            Text("Процессы")
+            Text("block_processes")
             ForEach(vm.topProcessesByRAM.indices, id: \.self) { i in
                 let p = vm.topProcessesByRAM[i]
                 HStack {

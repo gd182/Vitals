@@ -9,6 +9,6 @@ import SwiftUI
 
 struct MenuBarSettingsView: View {
     var body: some View {
-        Text("Settings")
+        Text("settings_tab_menubar")
     }
 }

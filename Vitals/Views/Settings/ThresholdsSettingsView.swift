@@ -14,9 +14,9 @@ struct ThresholdsSettingsView: View {
     
     var body: some View {
         VStack {
-            Text("Thresholds")
+            Text("settings_tab_thresholds")
             HStack {
-                Text("Предупреждение").frame(maxWidth: .infinity, alignment: .leading)
+                Text("threshold_warning").frame(maxWidth: .infinity, alignment: .leading)
                 Slider(value: $warningThreshold, in: 0...100, step: 1)
                     .onChange(of: warningThreshold) { newValue in
                         if newValue > criticalThreshold {
@@ -27,7 +27,7 @@ struct ThresholdsSettingsView: View {
                 Text(String(format: "%.0f%%", warningThreshold)).frame(width: 40)
             }
             HStack {
-                Text("Критическое").frame(maxWidth: .infinity, alignment: .leading)
+                Text("threshold_critical").frame(maxWidth: .infinity, alignment: .leading)
                 Slider(value: $criticalThreshold, in: 0...100, step: 1)
                     .onChange(of: criticalThreshold) { newValue in
                         if newValue < warningThreshold {

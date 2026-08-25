@@ -13,10 +13,10 @@ struct RAMView: View {
     @StateObject var config = DashboardConfig(namespace: "RAM")
 
     let blocks: [DashboardBlock] = [
-        DashboardBlock(id: "ram_indicators", title: "Индикаторы", content: .ramIndicators, hasSettings: false),
-        DashboardBlock(id: "ram_details", title: "Детали RAM", content: .ramDetails, hasSettings: false),
-        DashboardBlock(id: "ram_chart", title: "График", content: .ramChart(namespace: "chart_RAM"), hasSettings: true),
-        DashboardBlock(id: "ram_processes", title: "Процессы", content: .ramProcesses, hasSettings: false), 
+        DashboardBlock(id: "ram_indicators", title: "block_indicators", content: .ramIndicators, hasSettings: false),
+        DashboardBlock(id: "ram_details", title: "block_details_ram", content: .ramDetails, hasSettings: false),
+        DashboardBlock(id: "ram_chart", title: "block_chart", content: .ramChart(namespace: "chart_RAM"), hasSettings: true),
+        DashboardBlock(id: "ram_processes", title: "block_processes", content: .ramProcesses, hasSettings: false), 
     ]
     
     var body: some View {

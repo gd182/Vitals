@@ -1,7 +1,7 @@
 <h1 align="center">Vitals</h1>
 
 <p align="center">
-  A lightweight macOS menu bar monitor for CPU, GPU, and RAM — built with a C++ core and SwiftUI frontend
+  A lightweight macOS menu bar monitor for CPU, GPU, and RAM — built with a C++ core and SwiftUI frontend. Supports English, Russian, and German with live language switching.
 </p>
 
 ###
@@ -50,7 +50,7 @@ Vitals is split into three layers:
 
 ## Requirements
 
-- macOS 13 Ventura or later
+- macOS 14 Sonoma or later
 - Xcode 15+
 - Apple Silicon or Intel Mac
 

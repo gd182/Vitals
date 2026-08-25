@@ -10,21 +10,41 @@ import SwiftUI
 struct GeneralSettingsView: View {
     @AppStorage("updateInterval") var updateInterval: Double = 1.0
     
+    @EnvironmentObject var langManager: LanguageManager
+    
     let values: [Double] = [0.5, 1, 2, 3, 5, 10, 15, 30, 60]
-    let labels = ["0.5 сек", "1 сек", "2 сек", "3 сек", "5 сек", "10 сек", "15 сек", "30 сек", "60 сек"]
+    
+    let valuesLang: [String] = ["en", "ru", "de"]
+    let labelsLang = ["English", "Русский", "Deutsch"]
 
     var body: some View {
-        Text("General settings")
-        HStack {
-            Picker("", selection: $updateInterval) {
-                ForEach(values.indices, id: \.self) { i in
-                    Text(labels[i]).tag(values[i])
+        VStack {
+            Text("settings_tab_general")
+            HStack {
+                Picker(selection: $updateInterval) {
+                    ForEach(values, id: \.self) { val in
+                        (Text(verbatim: val < 1 ? "0.5" : "\(Int(val))") + Text(verbatim: " ") + Text("unit_sec"))
+                            .tag(val)
+                    }
+                } label: {
+                    EmptyView()
                 }
+                .pickerStyle(.menu)
+                .labelsHidden()
+                .frame(width: 120)
+                .controlSize(.large)
+                Picker(selection: $langManager.appLanguage) {
+                    ForEach(valuesLang.indices, id: \.self) { i in
+                        Text(labelsLang[i]).tag(valuesLang[i])
+                    }
+                } label: {
+                    EmptyView()
+                }
+                .pickerStyle(.menu)
+                .labelsHidden()
+                .frame(width: 120)
+                .controlSize(.large)
             }
-            .pickerStyle(.menu)
-            .labelsHidden()
-            .frame(width: 120)
-            .controlSize(.large)
         }
     }
 }

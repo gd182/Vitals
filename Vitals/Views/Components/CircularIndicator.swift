@@ -3,7 +3,7 @@ import SwiftUI
 struct CircularIndicator: View {
     var value: Double
     var text: String
-    var label: String
+    var label: LocalizedStringKey
 
     
     var indicatorColor: Color {

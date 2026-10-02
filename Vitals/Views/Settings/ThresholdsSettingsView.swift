@@ -18,7 +18,7 @@ struct ThresholdsSettingsView: View {
             HStack {
                 Text("threshold_warning").frame(maxWidth: .infinity, alignment: .leading)
                 Slider(value: $warningThreshold, in: 0...100, step: 1)
-                    .onChange(of: warningThreshold) { newValue in
+                    .onChange(of: warningThreshold) { _, newValue in
                         if newValue > criticalThreshold {
                             criticalThreshold = newValue
                         }
@@ -29,7 +29,7 @@ struct ThresholdsSettingsView: View {
             HStack {
                 Text("threshold_critical").frame(maxWidth: .infinity, alignment: .leading)
                 Slider(value: $criticalThreshold, in: 0...100, step: 1)
-                    .onChange(of: criticalThreshold) { newValue in
+                    .onChange(of: criticalThreshold) { _, newValue in
                         if newValue < warningThreshold {
                             warningThreshold = newValue
                         }

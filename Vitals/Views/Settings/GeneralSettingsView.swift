@@ -1,50 +1,38 @@
-//
-//  GeneralSettingsView.swift
-//  Vitals
-//
-//  Created by Алексей on 7/30/26.
-//
-
 import SwiftUI
 
 struct GeneralSettingsView: View {
-    @AppStorage("updateInterval") var updateInterval: Double = 1.0
-    
+    @AppStorage("updateInterval") private var updateInterval: Double = 1
+    @AppStorage("backgroundUpdateInterval") private var backgroundInterval: Double?
+    @AppStorage("processUpdateInterval") private var processInterval: Double = 2
+    @AppStorage("temperatureUpdateInterval") private var temperatureInterval: Double = 3
     @EnvironmentObject var langManager: LanguageManager
-    
-    let values: [Double] = [0.5, 1, 2, 3, 5, 10, 15, 30, 60]
-    
-    let valuesLang: [String] = ["en", "ru", "de"]
-    let labelsLang = ["English", "Русский", "Deutsch"]
 
     var body: some View {
-        VStack {
-            Text("settings_tab_general")
-            HStack {
-                Picker(selection: $updateInterval) {
-                    ForEach(values, id: \.self) { val in
-                        (Text(verbatim: val < 1 ? "0.5" : "\(Int(val))") + Text(verbatim: " ") + Text("unit_sec"))
-                            .tag(val)
-                    }
-                } label: {
-                    EmptyView()
-                }
-                .pickerStyle(.menu)
-                .labelsHidden()
-                .frame(width: 120)
-                .controlSize(.large)
-                Picker(selection: $langManager.appLanguage) {
-                    ForEach(valuesLang.indices, id: \.self) { i in
-                        Text(labelsLang[i]).tag(valuesLang[i])
-                    }
-                } label: {
-                    EmptyView()
-                }
-                .pickerStyle(.menu)
-                .labelsHidden()
-                .frame(width: 120)
-                .controlSize(.large)
+        Form {
+            intervalPicker("settings_update_interval", selection: $updateInterval)
+            intervalPicker("settings_background_interval", selection: Binding(
+                get: { backgroundInterval ?? MonitoringPreferences().backgroundInterval },
+                set: { backgroundInterval = $0 }
+            ))
+            intervalPicker("settings_process_interval", selection: $processInterval)
+            intervalPicker("settings_temperature_interval", selection: $temperatureInterval)
+            Picker("settings_language", selection: $langManager.appLanguage) {
+                Text("English").tag("en")
+                Text("Русский").tag("ru")
+                Text("Deutsch").tag("de")
+            }
+            .pickerStyle(.menu)
+        }
+        .padding(20)
+    }
+
+    private func intervalPicker(_ title: LocalizedStringKey, selection: Binding<Double>) -> some View {
+        Picker(title, selection: selection) {
+            ForEach(MonitoringPreferences.intervals, id: \.self) { value in
+                (Text(verbatim: value < 1 ? "0.5" : "\(Int(value))") + Text(verbatim: " ") + Text("unit_sec"))
+                    .tag(value)
             }
         }
+        .pickerStyle(.menu)
     }
 }

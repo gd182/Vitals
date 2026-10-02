@@ -3,6 +3,10 @@ import SwiftUI
 @main
 struct ChartColorTests {
     @MainActor static func main() {
+        let indicator = CircularIndicator(value: 18, text: "18%", label: "CPU")
+        assert(indicator.value == 18 && indicator.text == "18%")
+        let unavailable = CircularIndicator(value: nil, text: "N/A", label: "temp")
+        assert(unavailable.value == nil)
         let scale = UsageColorScale()
         assert(UsagePalette.encode(Color(red: 1, green: 128.0 / 255, blue: 0)) == 0xFF8000)
         for value in [0, 0xFFFFFF, 0x007AFF, 0xFF2D55] {

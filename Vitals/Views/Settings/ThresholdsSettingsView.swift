@@ -12,6 +12,8 @@ struct ThresholdsSettingsView: View {
     
     @AppStorage("warningThreshold") var warningThreshold: Double = 50
     @AppStorage("criticalThreshold") var criticalThreshold: Double = 80
+
+    init() {}
     
     var body: some View {
         Form {

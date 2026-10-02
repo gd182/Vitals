@@ -9,7 +9,12 @@ struct CircularIndicator: View {
     @AppStorage("warningThreshold") private var warningThreshold: Double = 50
     @AppStorage("criticalThreshold") private var criticalThreshold: Double = 80
 
-    
+    init(value: Double?, text: String, label: LocalizedStringKey) {
+        self.value = value
+        self.text = text
+        self.label = label
+    }
+
     var indicatorColor: Color {
         guard let value, value.isFinite else { return .secondary }
         return palette.color(for: UsageColorScale(warning: Float(warningThreshold), critical: Float(criticalThreshold))

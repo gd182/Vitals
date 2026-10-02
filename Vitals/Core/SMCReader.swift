@@ -8,7 +8,7 @@
 import IOKit
 
 extension FourCharCode {
-    init(fromString str: String) {
+    nonisolated init(fromString str: String) {
         precondition(str.count == 4)
         
         self = str.utf8.reduce(0) { sum, character in
@@ -16,7 +16,7 @@ extension FourCharCode {
         }
     }
     
-    func toString() -> String {
+    nonisolated func toString() -> String {
         return String(describing: UnicodeScalar(self >> 24 & 0xff)!) +
                String(describing: UnicodeScalar(self >> 16 & 0xff)!) +
                String(describing: UnicodeScalar(self >> 8  & 0xff)!) +
@@ -24,7 +24,7 @@ extension FourCharCode {
     }
 }
 
-public class SMCReader {
+nonisolated public class SMCReader {
     
     enum DataType: UInt32 {
         case UI8  = 0x75693820  // "ui8 "
@@ -114,6 +114,7 @@ public class SMCReader {
     }
     
     private var conn: io_connect_t = 0
+    private var keyInfoCache: [UInt32: KeyData_t.keyInfo_t] = [:]
     
     public init() {
         var result: kern_return_t
@@ -142,8 +143,16 @@ public class SMCReader {
         }
     }
     
+    deinit {
+        if conn != 0 { IOServiceClose(conn) }
+    }
+
     public func close() -> kern_return_t {
-        return IOServiceClose(conn)
+        guard conn != 0 else { return kIOReturnSuccess }
+        let result = IOServiceClose(conn)
+        conn = 0
+        keyInfoCache.removeAll()
+        return result
     }
         
     private func readValue(_ value: UnsafeMutablePointer<Value_t>) -> kern_return_t {
@@ -155,9 +164,14 @@ public class SMCReader {
         
         var resultCall: kern_return_t = 0
         
-        resultCall = callKey(Keys.kernelIndex.rawValue, &input, &output)
-        if resultCall != kIOReturnSuccess {
-            return resultCall
+        if let keyInfo = keyInfoCache[input.key] {
+            output.keyInfo = keyInfo
+        } else {
+            resultCall = callKey(Keys.kernelIndex.rawValue, &input, &output)
+            if resultCall != kIOReturnSuccess {
+                return resultCall
+            }
+            keyInfoCache[input.key] = output.keyInfo
         }
         
         value.pointee.dataSize = UInt32(output.keyInfo.dataSize)
@@ -170,7 +184,12 @@ public class SMCReader {
             return resultCall
         }
         
-        memcpy(&value.pointee.bytes, &output.bytesAnswer, min(Int(value.pointee.dataSize), value.pointee.bytes.count))
+        let byteCount = min(Int(value.pointee.dataSize), value.pointee.bytes.count)
+        value.pointee.bytes.withUnsafeMutableBytes { destination in
+            withUnsafeBytes(of: output.bytesAnswer) { source in
+                destination.copyBytes(from: source.prefix(byteCount))
+            }
+        }
         
         return kIOReturnSuccess
     }
@@ -252,31 +271,32 @@ public class SMCReader {
     }
     
     private func callKey(_ key: UInt8,_ input: inout KeyData_t, _ output: inout KeyData_t) -> kern_return_t {
+        guard conn != 0 else { return kIOReturnNotOpen }
         var outputSize = MemoryLayout<KeyData_t>.stride
         return IOConnectCallStructMethod(conn, UInt32(key), &input, MemoryLayout<KeyData_t>.stride, &output, &outputSize)
     }
 }
 
 extension UInt16 {
-    init(bytes: (UInt8, UInt8)) {
+    nonisolated init(bytes: (UInt8, UInt8)) {
         self = UInt16(bytes.0) << 8 | UInt16(bytes.1)
     }
 }
 
 extension UInt32 {
-    init(bytes: (UInt8, UInt8, UInt8, UInt8)) {
+    nonisolated init(bytes: (UInt8, UInt8, UInt8, UInt8)) {
         self = UInt32(bytes.0) << 24 | UInt32(bytes.1) << 16 | UInt32(bytes.2) << 8 | UInt32(bytes.3)
     }
 }
 
 extension Int {
-    init(fromFPE2 bytes: (UInt8, UInt8)) {
+    nonisolated init(fromFPE2 bytes: (UInt8, UInt8)) {
         self = (Int(bytes.0) << 6) + (Int(bytes.1) >> 2)
     }
 }
 
 extension Float {
-    init?(_ bytes: [UInt8]) {
+    nonisolated init?(_ bytes: [UInt8]) {
         self = bytes.withUnsafeBytes { $0.load(fromByteOffset: 0, as: Self.self) }
     }
 }

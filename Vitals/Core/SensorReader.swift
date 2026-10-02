@@ -6,8 +6,9 @@
 //
 
 import Darwin
+import Foundation
 
-enum ChipPlatform {
+nonisolated enum ChipPlatform: Equatable {
     case intel
     
     case m1
@@ -38,7 +39,7 @@ enum ChipPlatform {
     case unknown
 }
 
-final class SensorReader {
+nonisolated final class SensorReader {
     static let shared = SensorReader()
     var chip: ChipPlatform = .unknown
     
@@ -48,61 +49,81 @@ final class SensorReader {
         chip = Self.detectChip()
     }
     
+    private var temperatureKeys: [FourCharCode]?
+    private var nextDiscoveryTime: TimeInterval = 0
+
     func cpuTemperature() -> Float? {
-        if let value = Self.smc.getDecodeValue(FourCharCode(fromString: "TC0D")), value < 110 {
+        let now = ProcessInfo.processInfo.systemUptime
+        func read(_ key: FourCharCode) -> Float? {
+            guard let value = Self.smc.getDecodeValue(key), value.isFinite, value > 0, value < 110 else { return nil }
             return value
-        } else if let value = Self.smc.getDecodeValue(FourCharCode(fromString: "TC0E")), value < 110 {
-            return value
-        } else if let value = Self.smc.getDecodeValue(FourCharCode(fromString: "TC0F")), value < 110 {
-            return value
-        } else if let value = Self.smc.getDecodeValue(FourCharCode(fromString: "TC0P")), value < 110 {
-            return value
-        } else if let value = Self.smc.getDecodeValue(FourCharCode(fromString: "TC0H")), value < 110 {
-            return value
-        } else {
-            var total: Float = 0
-            var counter: Float = 0
-            let list = Self.keysForChip(chip)
-            list.forEach { (key: String) in
-                if let value = Self.smc.getDecodeValue(FourCharCode(fromString: key)) {
-                    total += value
-                    counter += 1
-                }
-            }
-            return counter > 0 ? total / counter : nil
         }
+        if let keys = temperatureKeys {
+            let values = keys.compactMap(read)
+            if !values.isEmpty { return values.reduce(0, +) / Float(values.count) }
+            temperatureKeys = nil
+            nextDiscoveryTime = now + 60
+        }
+        guard now >= nextDiscoveryTime else { return nil }
+        for name in ["TC0D", "TC0E", "TC0F", "TC0P", "TC0H"] {
+            let key = FourCharCode(fromString: name)
+            if let value = read(key) {
+                temperatureKeys = [key]
+                return value
+            }
+        }
+        var keys: [FourCharCode] = []
+        var values: [Float] = []
+        for name in Self.keysForChip(chip) {
+            let key = FourCharCode(fromString: name)
+            if let value = read(key) {
+                keys.append(key)
+                values.append(value)
+            }
+        }
+        guard !values.isEmpty else {
+            nextDiscoveryTime = now + 60
+            return nil
+        }
+        temperatureKeys = keys
+        return values.reduce(0, +) / Float(values.count)
     }
     
     private static func detectChip() -> ChipPlatform {
         var size = 0
-        sysctlbyname("machdep.cpu.brand_string", nil, &size, nil, 0)
-        var chars = [CChar](repeating: 0, count: size)
-        sysctlbyname("machdep.cpu.brand_string", &chars, &size, nil, 0)
+        guard sysctlbyname("machdep.cpu.brand_string", nil, &size, nil, 0) == 0, size > 0 else {
+            return .unknown
+        }
+        var chars = [CChar](repeating: 0, count: size + 1)
+        guard sysctlbyname("machdep.cpu.brand_string", &chars, &size, nil, 0) == 0 else {
+            return .unknown
+        }
         let brand = String(cString: chars)
         
         return getPlatform(cpuName: brand)
     }
     
-    static private func getPlatform(cpuName: String?) -> ChipPlatform {
+    static func getPlatform(cpuName: String?) -> ChipPlatform {
         if let name = cpuName?.lowercased() {
-            if name.contains("intel") {
+            let words = Set(name.split(whereSeparator: { !$0.isLetter && !$0.isNumber }).map(String.init))
+            if words.contains("intel") {
                 return .intel
-            } else if name.contains("m1") {
-                return name.contains("pro") ? .m1pro : name.contains("max") ? .m1max : name.contains("ultra") ? .m1ultra : .m1
-            } else if name.contains("m2") {
-                return name.contains("pro") ? .m2pro : name.contains("max") ? .m2max : name.contains("ultra") ? .m2ultra : .m2
-            } else if name.contains("m3") {
-                return name.contains("pro") ? .m3pro : name.contains("max") ? .m3max : name.contains("ultra") ? .m3ultra : .m3
-            } else if name.contains("m4") {
-                return name.contains("pro") ? .m4pro : name.contains("max") ? .m4max : name.contains("ultra") ? .m4ultra : .m4
-            } else if name.contains("m5") {
-                return name.contains("pro") ? .m5pro : name.contains("max") ? .m5max : name.contains("ultra") ? .m5ultra : .m5
+            } else if words.contains("m1") {
+                return words.contains("pro") ? .m1pro : words.contains("max") ? .m1max : words.contains("ultra") ? .m1ultra : .m1
+            } else if words.contains("m2") {
+                return words.contains("pro") ? .m2pro : words.contains("max") ? .m2max : words.contains("ultra") ? .m2ultra : .m2
+            } else if words.contains("m3") {
+                return words.contains("pro") ? .m3pro : words.contains("max") ? .m3max : words.contains("ultra") ? .m3ultra : .m3
+            } else if words.contains("m4") {
+                return words.contains("pro") ? .m4pro : words.contains("max") ? .m4max : words.contains("ultra") ? .m4ultra : .m4
+            } else if words.contains("m5") {
+                return words.contains("pro") ? .m5pro : words.contains("max") ? .m5max : words.contains("ultra") ? .m5ultra : .m5
             }
         }
         return .unknown
     }
     
-    private static func keysForChip(_ chip: ChipPlatform) -> [String] {
+    static func keysForChip(_ chip: ChipPlatform) -> [String] {
         switch chip {
         case .m1, .m1pro, .m1max, .m1ultra:
             return ["Tp09", "Tp0T", "Tp01", "Tp05", "Tp0D", "Tp0H", "Tp0L", "Tp0P", "Tp0X", "Tp0b"]
@@ -114,7 +135,10 @@ final class SensorReader {
             return ["Te05", "Te09", "Te0H", "Te0S", "Tp01", "Tp05", "Tp09", "Tp0D", "Tp0V", "Tp0Y", "Tp0b", "Tp0e"]
         case .m5, .m5pro, .m5max, .m5ultra:
             return ["Tp00", "Tp04", "Tp08", "Tp0C", "Tp0G", "Tp0K", "Tp0O", "Tp0R", "Tp0U", "Tp0X", "Tp0a", "Tp0d", "Tp0g", "Tp0j", "Tp0m", "Tp0p", "Tp0u", "Tp0y"]
-        default:
+        case .unknown:
+            // Probe known CPU temperature keys once for unrecognized Apple Silicon generations.
+            return Array(Set([ChipPlatform.m1, .m2, .m3, .m4, .m5].flatMap(keysForChip))).sorted()
+        case .intel:
             return []
         }
     }

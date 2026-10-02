@@ -14,10 +14,11 @@
 namespace Vitals {
     GPUStats::GPUStats()
     {
-        io_iterator_t iter;
-        IOServiceGetMatchingServices(kIOMainPortDefault, IOServiceMatching("IOAccelerator"), &iter);
-        service = IOIteratorNext(iter);
-        IOObjectRelease(iter);
+        io_iterator_t iter = 0;
+        if (IOServiceGetMatchingServices(kIOMainPortDefault, IOServiceMatching("IOAccelerator"), &iter) == kIOReturnSuccess) {
+            service = IOIteratorNext(iter);
+            IOObjectRelease(iter);
+        }
         gpuInfo.vramTotal = 0;
         
         #if defined(__arm64__) || defined(__aarch64__)
@@ -36,10 +37,12 @@ namespace Vitals {
     
     GPUInfo GPUStats::getUsage()
     {
-        CFMutableDictionaryRef props = nullptr;
-        if (IORegistryEntryCreateCFProperties(service, &props, kCFAllocatorDefault, 0) != kIOReturnSuccess)
+        if (!service)
             return gpuInfo;
-        CFDictionaryRef perfStats = (CFDictionaryRef)CFDictionaryGetValue(props, CFSTR("PerformanceStatistics"));
+        CFTypeRef property = IORegistryEntryCreateCFProperty(service, CFSTR("PerformanceStatistics"), kCFAllocatorDefault, 0);
+        if (!property)
+            return gpuInfo;
+        CFDictionaryRef perfStats = CFGetTypeID(property) == CFDictionaryGetTypeID() ? (CFDictionaryRef)property : nullptr;
         if (perfStats) {
             // utilization
             CFNumberRef utilRef = (CFNumberRef)CFDictionaryGetValue(perfStats, CFSTR("Device Utilization %"));
@@ -94,8 +97,7 @@ namespace Vitals {
                 }
             #endif
         }
-        CFRelease(props);
+        CFRelease(property);
         return gpuInfo;
     }
 }
-

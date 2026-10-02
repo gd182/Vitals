@@ -20,13 +20,10 @@ struct CPUView: View {
             let newIDs = currentIDs.filter { !config.order.contains($0) }
             config.order.append(contentsOf: newIDs)
             
-            vm.isMonitoringProcessesCPU = true
         }
-        .onDisappear {vm.isMonitoringProcessesCPU = false}
     }
 }
 
 #Preview {
     CPUView().environmentObject(SystemViewModel())
 }
-

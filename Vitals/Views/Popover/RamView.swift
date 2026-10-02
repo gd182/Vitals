@@ -27,13 +27,10 @@ struct RAMView: View {
             let newIDs = currentIDs.filter { !config.order.contains($0) }
             config.order.append(contentsOf: newIDs)
             
-            vm.isMonitoringProcessesRAM = true
         }
-        .onDisappear {vm.isMonitoringProcessesRAM = false}
     }
 }
 
 #Preview {
     RAMView().environmentObject(SystemViewModel())
 }
-

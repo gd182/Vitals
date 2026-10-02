@@ -1,14 +1,14 @@
 import SwiftUI
 
 struct MenuBarLabelView: View {
-    @ObservedObject var vm: SystemViewModel
+    @ObservedObject var metrics: MenuBarMetrics
     let module: String  // "CPU" или "RAM"
     
     var body: some View {
         switch module {
-        case "RAM": Mini(title: "RAM", value: String(format: "%.0f%%", vm.memoryPercent))
-        case "GPU": Mini(title: "GPU", value: String(format: "%.0f%%", vm.gpuUtilization))
-        default:    Mini(title: "CPU", value: String(format: "%.0f%%", vm.cpuUsage))
+        case "RAM": Mini(title: "RAM", value: "\(metrics.ram)%")
+        case "GPU": Mini(title: "GPU", value: "\(metrics.gpu)%")
+        default:    Mini(title: "CPU", value: "\(metrics.cpu)%")
         }
     }
 }

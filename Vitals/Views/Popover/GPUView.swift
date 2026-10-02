@@ -29,13 +29,10 @@ struct GPUView: View {
             let newIDs = currentIDs.filter { !config.order.contains($0) }
             config.order.append(contentsOf: newIDs)
             
-            vm.isMonitoringProcessesGPU = true
         }
-        .onDisappear {vm.isMonitoringProcessesGPU = false}
     }
 }
 
 #Preview {
     GPUView().environmentObject(SystemViewModel())
 }
-

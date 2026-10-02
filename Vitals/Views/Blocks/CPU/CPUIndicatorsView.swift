@@ -13,8 +13,8 @@ struct CPUIndicatorsView: View {
     var body: some View {
         HStack {
             CircularIndicator(
-                value: Double(vm.cpuTemperature),
-                text: String(format: "%.0fC", vm.cpuTemperature),
+                value: vm.cpuTemperature.map(Double.init),
+                text: vm.cpuTemperature.map { String(format: "%.0fC", $0) } ?? "N/A",
                 label: "temp"
             )
             .padding()
@@ -26,5 +26,7 @@ struct CPUIndicatorsView: View {
             .padding()
         }
         .padding(10)
+        .onAppear { vm.isMonitoringTemperature = true }
+        .onDisappear { vm.isMonitoringTemperature = false }
     }
 }

@@ -46,6 +46,7 @@ typedef struct {
 - (ObjCGPUUsage)gpuUsage;
 - (NSArray *)topProcessesByCPU;
 - (NSArray *)topProcessesByRAM;
+- (void)resetProcessCPUHistory;
 - (void)update;
 @end
 

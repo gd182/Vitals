@@ -61,4 +61,8 @@
     return result;
 }
 
+- (void)resetProcessCPUHistory {
+    _procInfo.resetCPUHistory();
+}
+
 @end

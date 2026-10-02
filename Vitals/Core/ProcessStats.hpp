@@ -11,6 +11,8 @@
 #include <string>
 #include <string_view>
 #include <vector>
+#include <unordered_map>
+#include <chrono>
 
 namespace Vitals
 {
@@ -26,11 +28,17 @@ namespace Vitals
     public:
         ProcessStats() = default;
         ~ProcessStats() = default;
-        std::vector<ProcessInfo> getProcCPUInfo(bool sortAscending = true, int count = 10);
-        std::vector<ProcessInfo> getProcRAMInfo(bool sortAscending = true, int count = 10);
+        std::vector<ProcessInfo> getProcCPUInfo(bool sortAscending = false, int count = 10);
+        std::vector<ProcessInfo> getProcRAMInfo(bool sortAscending = false, int count = 10);
+        void resetCPUHistory();
     private:
-        std::vector<ProcessInfo> getProcInfo (std::string_view command, int count);
-        void infoSort(std::vector<ProcessInfo>& temp, int count, bool sortDirection = true);
+        struct CPUSample {
+            uint64_t cpuNs;
+            uint64_t startTime;
+        };
+        std::unordered_map<int, CPUSample> prevCpuNs_;
+        std::chrono::steady_clock::time_point prevCpuTime_;
+        bool cpuFirstRun_ = true;
     };
 }
 

@@ -1,75 +1,58 @@
 #include "CPUStats.hpp"
 
-#include <cstdio>
 #include <mach/mach.h>
 #include <mach/processor_info.h>
 #include <mach/mach_host.h>
 
-namespace Vitals
-{
-    CPUStats::~CPUStats()
-    {
-        this->prevTicks.clear();
-    }
+namespace Vitals {
+    CPUStats::~CPUStats() = default;
 
-    void CPUStats::update()
-    {
-        natural_t processorCount;
-        processor_info_array_t infoArray;
-        mach_msg_type_number_t infoCount;
-        host_processor_info(mach_host_self(), PROCESSOR_CPU_LOAD_INFO, 
+    void CPUStats::update() {
+        natural_t processorCount = 0;
+        processor_info_array_t infoArray = nullptr;
+        mach_msg_type_number_t infoCount = 0;
+        const auto host = mach_host_self();
+        const auto result = host_processor_info(host, PROCESSOR_CPU_LOAD_INFO,
             &processorCount, &infoArray, &infoCount);
-        double totalUsage = 0.0;
-        double totalUser = 0.0, totalSystem = 0.0, totalIdle = 0.0;
-        CPUStatsResult cpuStatsResult;
-        if (this->prevTicks.empty())
-        {
-            this->prevTicks.resize(processorCount);
-            cpuStatsResult.perCore.resize(processorCount);
-            for (natural_t i = 0; i < processorCount; ++i)
-            {
-                processor_cpu_load_info_t load = (processor_cpu_load_info_t)infoArray + i;
-                this->prevTicks[i] = {load->cpu_ticks[CPU_STATE_USER], 
-                                    load->cpu_ticks[CPU_STATE_SYSTEM], 
-                                      load->cpu_ticks[CPU_STATE_IDLE], 
-                                      load->cpu_ticks[CPU_STATE_NICE]};
-            }
-        }
-        else
-        {
-            int i = 0;
-            cpuStatsResult.perCore.resize(processorCount);
-            for (auto &tick : this->prevTicks)
-            {
-                processor_cpu_load_info_t load = (processor_cpu_load_info_t)infoArray + i;
-                uint64_t dUser = load->cpu_ticks[CPU_STATE_USER] - tick.user;
-                uint64_t dSystem = load->cpu_ticks[CPU_STATE_SYSTEM] - tick.system;
-                uint64_t dIdle = load->cpu_ticks[CPU_STATE_IDLE] - tick.idle;
-                uint64_t dNice = load->cpu_ticks[CPU_STATE_NICE] - tick.nice;
-                cpuStatsResult.perCore[i].user = (double)dUser / (dUser + dSystem + dIdle + dNice) * 100;
-                cpuStatsResult.perCore[i].system = (double)dSystem / (dUser + dSystem + dIdle + dNice) * 100;
-                cpuStatsResult.perCore[i].idle = (double)dIdle / (dUser + dSystem + dIdle + dNice) * 100;
-                double usage = (double)(dUser + dSystem) / (dUser + dSystem + dIdle + load->cpu_ticks[CPU_STATE_NICE] - tick.nice) * 100;
-                cpuStatsResult.perCore[i].total = usage;
-                totalUsage += usage;
-                this->prevTicks[i] = {load->cpu_ticks[CPU_STATE_USER], 
-                                    load->cpu_ticks[CPU_STATE_SYSTEM], 
-                                      load->cpu_ticks[CPU_STATE_IDLE], 
-                                      load->cpu_ticks[CPU_STATE_NICE]};
-                totalUser += (double)dUser / (dUser + dSystem + dIdle + dNice) * 100;
-                totalSystem += (double)dSystem / (dUser + dSystem + dIdle + dNice) * 100;
-                totalIdle += (double)dIdle / (dUser + dSystem + dIdle + dNice) * 100;
-                
-                i++;
-            }
-            totalUsage /= processorCount;
-        }
-        cpuStatsResult.average.user = totalUser / processorCount;
-        cpuStatsResult.average.system = totalSystem / processorCount;
-        cpuStatsResult.average.idle = totalIdle / processorCount;
-        cpuStatsResult.average.total = totalUsage;
-        vm_deallocate(mach_task_self(), (vm_address_t)infoArray, infoCount * sizeof(integer_t));
+        mach_port_deallocate(mach_task_self(), host);
+        if (result != KERN_SUCCESS)
+            return;
 
-        this->lastResult = cpuStatsResult;
+        const bool hasBaseline = prevTicks.size() == processorCount;
+        prevTicks.resize(processorCount);
+        lastResult.perCore.resize(processorCount);
+        lastResult.average = {};
+        for (natural_t i = 0; i < processorCount; ++i) {
+            const auto load = reinterpret_cast<processor_cpu_load_info_t>(infoArray) + i;
+            const CoreTicks current = {load->cpu_ticks[CPU_STATE_USER], load->cpu_ticks[CPU_STATE_SYSTEM],
+                load->cpu_ticks[CPU_STATE_IDLE], load->cpu_ticks[CPU_STATE_NICE]};
+            CPUUsage usage{};
+            if (hasBaseline) {
+                // CPU ticks are wrapping 32-bit counters on Darwin.
+                const auto user = uint32_t(current.user - prevTicks[i].user);
+                const auto system = uint32_t(current.system - prevTicks[i].system);
+                const auto idle = uint32_t(current.idle - prevTicks[i].idle);
+                const auto nice = uint32_t(current.nice - prevTicks[i].nice);
+                const double total = double(user) + system + idle + nice;
+                if (total > 0) {
+                    usage = {float((double(user) + system + nice) / total * 100),
+                        float((double(user) + nice) / total * 100),
+                        float(system / total * 100), float(idle / total * 100)};
+                }
+            }
+            prevTicks[i] = current;
+            lastResult.perCore[i] = usage;
+            lastResult.average.total += usage.total;
+            lastResult.average.user += usage.user;
+            lastResult.average.system += usage.system;
+            lastResult.average.idle += usage.idle;
+        }
+        if (processorCount > 0) {
+            lastResult.average.total /= processorCount;
+            lastResult.average.user /= processorCount;
+            lastResult.average.system /= processorCount;
+            lastResult.average.idle /= processorCount;
+        }
+        vm_deallocate(mach_task_self(), reinterpret_cast<vm_address_t>(infoArray), infoCount * sizeof(integer_t));
     }
 }

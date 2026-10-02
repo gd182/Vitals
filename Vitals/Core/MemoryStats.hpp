@@ -19,7 +19,7 @@ namespace Vitals
         ~MemoryStats() = default;
         MemoryUsage getUsage();
     private:
-        MemoryUsage memoryUsage;
+        MemoryUsage memoryUsage{};
     };
 }
 

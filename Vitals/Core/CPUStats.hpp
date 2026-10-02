@@ -35,7 +35,7 @@ namespace Vitals
         double getUsage() {return this->lastResult.average.total;}
         const CPUStatsResult& cpuStats() {return this->lastResult;}
     private:
-        CPUStatsResult lastResult;
+        CPUStatsResult lastResult{};
         std::vector<CoreTicks> prevTicks;
     };
 }

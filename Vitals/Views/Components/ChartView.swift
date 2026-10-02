@@ -14,7 +14,7 @@ struct ChartView: View {
     
     var body: some View {
         VStack(alignment: .leading) {
-            HistoryChartView(segments: vm[keyPath: history].segments, namespace: namespace)
+            HistoryChartView(segments: vm[keyPath: history].segments(warning: vm.warningThreshold, critical: vm.criticalThreshold), namespace: namespace)
         }
         .padding(8)
     }

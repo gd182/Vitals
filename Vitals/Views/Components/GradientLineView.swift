@@ -13,6 +13,8 @@ struct GradientLineView: View {
     @AppStorage var lineWidth: Double
     @AppStorage var height: Double
     @AppStorage var transitionWidth: Double
+    @AppStorage("warningThreshold") private var warningThreshold: Double = 50
+    @AppStorage("criticalThreshold") private var criticalThreshold: Double = 80
     
     init(segments: [Segment], namespace: String) {
             self.segments = segments
@@ -23,23 +25,16 @@ struct GradientLineView: View {
         }
 
     private var sortedSegments: [Segment] {
-        segments
-            .map { segment in
-                var copy = segment
-                copy.points.sort { $0.index < $1.index }
-                return copy
-            }
-            .filter { !$0.points.isEmpty }
-            .sorted {
-                ($0.points.first?.index ?? .max) <
-                ($1.points.first?.index ?? .max)
-            }
+        segments.filter { !$0.points.isEmpty }
     }
 
     var body: some View {
         Canvas { context, size in
             let sorted = sortedSegments
-            let sourcePoints = sorted.flatMap(\.points)
+            var sourcePoints: [HistoryPoint] = []
+            for point in sorted.flatMap(\.points) where sourcePoints.last?.index != point.index {
+                sourcePoints.append(point)
+            }
 
 
             guard sourcePoints.count > 1,
@@ -58,12 +53,10 @@ struct GradientLineView: View {
                 return
             }
 
-            let categoryGradient = makeCategoryGradient(
-                segments: sorted,
-                indexRange: indexRange,
-                transitionWidth: transitionWidth,
-                canvasWidth: size.width
-            )
+            let colorScale = UsageColorScale(warning: Float(warningThreshold), critical: Float(criticalThreshold))
+            let categoryGradient = Gradient(stops: colorScale.gradientStops(
+                points: sourcePoints, width: size.width, transitionWidth: transitionWidth
+            ).map { .init(color: $0.category.color, location: $0.location) })
 
             drawArea(
                 context: context,
@@ -156,108 +149,8 @@ struct GradientLineView: View {
         }
     }
 
-    // MARK: - Gradient
 
-    private func makeCategoryGradient(
-        segments: [Segment],
-        indexRange: ClosedRange<Int>,
-        transitionWidth: CGFloat,
-        canvasWidth: CGFloat
-    ) -> Gradient {
-
-        guard let firstSegment = segments.first else {
-            return Gradient(colors: [
-                .clear,
-                .clear
-            ])
-        }
-
-        let minIndex = indexRange.lowerBound
-        let maxIndex = indexRange.upperBound
-        let indexDistance = maxIndex - minIndex
-
-        guard indexDistance > 0 else {
-            let segmentColor = firstSegment.category.color
-
-            return Gradient(colors: [
-                segmentColor,
-                segmentColor
-            ])
-        }
-
-        func location(for index: Int) -> CGFloat {
-            let normalized =
-                CGFloat(index - minIndex) /
-                CGFloat(indexDistance)
-
-            return min(max(normalized, 0), 1)
-        }
-
-        let normalizedTransitionWidth =
-            transitionWidth / max(canvasWidth, 1)
-
-        var stops: [Gradient.Stop] = []
-
-        for segmentIndex in segments.indices {
-            let segment = segments[segmentIndex]
-
-            guard let segmentFirstPoint = segment.points.first,
-                  let segmentLastPoint = segment.points.last
-            else {
-                continue
-            }
-
-            let currentColor = segment.category.color
-
-            let segmentStart = location(for: segmentFirstPoint.index)
-
-            let segmentEnd = location(for: segmentLastPoint.index)
-
-            if segmentIndex == segments.startIndex {
-                stops.append(Gradient.Stop(color: currentColor, location: segmentStart))
-            }
-
-            let nextIndex = segments.index(
-                after: segmentIndex
-            )
-
-            if nextIndex < segments.endIndex {
-                let nextSegment = segments[nextIndex]
-
-                guard let nextFirstPoint =
-                        nextSegment.points.first
-                else {
-                    continue
-                }
-
-                let nextColor = nextSegment.category.color
-
-                let transitionStart = max(0, segmentEnd - normalizedTransitionWidth / 2)
-
-                let transitionEnd = min(1, segmentEnd + normalizedTransitionWidth / 2)
-
-                stops.append(Gradient.Stop(color: currentColor,location: transitionStart))
-
-                stops.append(Gradient.Stop(color: nextColor, location: transitionEnd))
-            } else {
-                stops.append(Gradient.Stop( color: currentColor, location: segmentEnd))
-            }
-        }
-
-        let sortedStops = stops.sorted {
-            $0.location < $1.location
-        }
-
-        guard sortedStops.count >= 2 else {
-            let segmentColor = firstSegment.category.color
-
-            return Gradient(colors: [segmentColor, segmentColor])
-        }
-
-        return Gradient(stops: sortedStops)
-    }
-
-    private func makeIndexRange(points: [(index: Int, value: Float)]) -> ClosedRange<Int>? {
+    private func makeIndexRange(points: [HistoryPoint]) -> ClosedRange<Int>? {
         guard let minIndex = points.min(by: { $0.index < $1.index })?.index,
               let maxIndex = points.max(by: { $0.index < $1.index })?.index,
               minIndex < maxIndex
@@ -265,7 +158,7 @@ struct GradientLineView: View {
         return minIndex...maxIndex
     }
 
-    private func makePoints(from sourcePoints: [(index: Int, value: Float)], size: CGSize, indexRange: ClosedRange<Int>) -> [CGPoint] {
+    private func makePoints(from sourcePoints: [HistoryPoint], size: CGSize, indexRange: ClosedRange<Int>) -> [CGPoint] {
         let minIndex = indexRange.lowerBound
         let maxIndex = indexRange.upperBound
         let indexDistance = maxIndex - minIndex

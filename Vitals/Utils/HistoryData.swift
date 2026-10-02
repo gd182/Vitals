@@ -7,7 +7,7 @@
 
 import SwiftUI
 
-enum TypeSegment {
+nonisolated enum TypeSegment: Equatable {
     case normal
     case warning
     case critical
@@ -22,31 +22,35 @@ enum TypeSegment {
 }
 
 struct Segment: Identifiable {
-    let id = UUID()
-    var points: [(index: Int, value: Float)]
+    var id: String { "\(category)-\(points.first?.index ?? 0)" }
+    var points: [HistoryPoint]
     let category: TypeSegment
+}
+
+nonisolated struct HistoryPoint {
+    let index: Int
+    let value: Float
+    let timestamp: Date
 }
 
 struct HistoryData {
     
-    private var buffer = CircularBuffer<Float>(initialCapacity: 60)
+    private var buffer = CircularBuffer<(value: Float, timestamp: Date)>(initialCapacity: 60)
     
-    mutating func append(_ value: Float) {
-        buffer.append(value: value)
+    mutating func append(_ value: Float, timestamp: Date = Date()) {
+        buffer.append(value: (value, timestamp))
     }
     
-    var segments: [Segment] {
-        let warning = Float(UserDefaults.standard.double(forKey: "warningThreshold"))
-        let critical = Float(UserDefaults.standard.double(forKey: "criticalThreshold"))
-        let warnValue = warning > 0 ? warning : 50
-        let critValue = critical > 0 ? critical : 80
-        var prevPoint: (index: Int, value: Float)? = nil
+    func segments(warning: Float, critical: Float) -> [Segment] {
+        let colorScale = UsageColorScale(warning: warning, critical: critical)
+        var prevPoint: HistoryPoint? = nil
         var idx = 0
         var segments: [Segment] = []
-        let buffer = self.buffer.toArray()
-        for value in buffer {
-            let category = value < warnValue ? TypeSegment.normal : value < critValue ? TypeSegment.warning : TypeSegment.critical
-            let newPoint = (index: idx, value: value)
+        for index in 0..<buffer.count {
+            guard let sample = buffer.get(index: index) else { continue }
+            let value = sample.value
+            let category = colorScale.category(for: value)
+            let newPoint = HistoryPoint(index: idx, value: value, timestamp: sample.timestamp)
             
             if segments.last?.category == category {
                 segments[segments.count - 1].points.append(newPoint)

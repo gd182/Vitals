@@ -11,11 +11,12 @@ struct ChartView: View {
     let namespace: String
     let history: KeyPath<SystemViewModel, HistoryData>
     @EnvironmentObject var vm: SystemViewModel
+    @AppStorage("panelCompact") private var compact = true
     
     var body: some View {
         VStack(alignment: .leading) {
             HistoryChartView(segments: vm[keyPath: history].segments(warning: vm.warningThreshold, critical: vm.criticalThreshold), namespace: namespace)
         }
-        .padding(8)
+        .padding(compact ? 2 : 8)
     }
 }

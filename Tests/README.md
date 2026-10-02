@@ -1,4 +1,4 @@
-# Optimization Checks
+# Application Checks
 
 Run from a logged-in macOS desktop with Xcode's command-line tools selected:
 
@@ -25,6 +25,15 @@ crossings, single-sample peaks and wide transitions that must not overlap.
 The color-test executable accepts an optional PNG path to render a preview with
 the actual Canvas graph and circular indicators.
 
+Settings checks cover all eight combinations of menu modules, including the
+CPU fallback when all stored toggles are disabled. They use volatile defaults.
+Layout checks use a separate disposable defaults suite for reordering, block
+visibility, reconciliation and reset, leaving application preferences untouched.
+
+Login-item checks inject a fake service and cover registration, approval,
+external status changes and errors. They never register a real login item.
+Verify actual launch after login manually using an installed, signed app.
+
 Build a Universal binary to validate both architectures:
 
 ```sh
@@ -46,6 +55,20 @@ bash Tests/run-checks.sh --ui
 ```
 
 The UI test temporarily shows CPU/RAM/GPU popovers and terminates its own copy.
+It also checks module removal and restoration, setup-window close/reopen, and
+watches automatic closing on Space changes and application deactivation,
+checks that switching modules closes the previous panel, and
+writes settings snapshots in English, Russian and German to the temporary
+directory. Launch-argument overrides avoid changing saved module preferences
+or marking the real app's setup complete.
+Workspace notifications are injected so real desktop activity cannot interrupt
+programmatically opened panels; actual app/Space switching remains a manual check.
+Panel snapshots cover CPU, RAM, GPU, and changing the GPU panel width and theme
+while it is open. Chart previews use the same Canvas renderer as live charts.
+Compact panels use content-driven height capped by available screen space;
+oversized content remains scrollable. Color checks include RGB persistence
+conversion and invalid-value fallback. UI snapshots also cover custom colors
+and the separate appearance tabs.
 It disables animations and uses application-defined popover behavior because programmatic opening does
 not establish the focus of a real status-button click. It exercises the normal
 close delegate and reopening, but does not simulate outside mouse clicks.

@@ -9,6 +9,7 @@ import SwiftUI
 
 struct RAMIndicatorsView: View {
     @EnvironmentObject var vm: SystemViewModel
+    @AppStorage("panelCompact") private var compact = true
     
     var body: some View {
         HStack {
@@ -17,8 +18,8 @@ struct RAMIndicatorsView: View {
                 text: String(format: "%.0f%%", vm.memoryPercent),
                 label: "RAM"
             )
-            .padding()
+            .frame(maxWidth: .infinity)
         }
-        .padding(10)
+        .padding(.vertical, compact ? 4 : 8)
     }
 }

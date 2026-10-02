@@ -9,9 +9,10 @@ import SwiftUI
 
 struct CPUDetailsView: View {
     @EnvironmentObject var vm: SystemViewModel
+    @AppStorage("panelCompact") private var compact = true
     
     var body: some View {
-        VStack(alignment: .leading) {
+        VStack(alignment: .leading, spacing: compact ? 4 : 8) {
             HStack {
                 Text("cpu_system")
                 Spacer()
@@ -29,6 +30,6 @@ struct CPUDetailsView: View {
             }
         }
         .font(.caption)
-        .padding(10)
+        .monospacedDigit()
     }
 }

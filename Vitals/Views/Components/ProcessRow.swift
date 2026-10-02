@@ -15,9 +15,9 @@ struct ProcessRow: View {
                 }
             }
             .frame(width: 16, height: 16)
-            Text(process.name).lineLimit(1).truncationMode(.tail)
+            Text(process.name).lineLimit(1).truncationMode(.tail).help(process.name)
             Spacer()
-            Text(value)
+            Text(value).monospacedDigit().fixedSize()
         }
         .padding(.vertical, 2)
         .font(.caption)

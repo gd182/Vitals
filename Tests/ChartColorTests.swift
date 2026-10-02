@@ -4,6 +4,12 @@ import SwiftUI
 struct ChartColorTests {
     @MainActor static func main() {
         let scale = UsageColorScale()
+        assert(UsagePalette.encode(Color(red: 1, green: 128.0 / 255, blue: 0)) == 0xFF8000)
+        for value in [0, 0xFFFFFF, 0x007AFF, 0xFF2D55] {
+            assert(UsagePalette.encode(UsagePalette.decode(value, fallback: .black)) == value)
+        }
+        assert(UsagePalette.encode(UsagePalette.decode(-1, fallback: .black)) == 0)
+        assert(UsagePalette.encode(UsagePalette.decode(0x1000000, fallback: .white)) == 0xFFFFFF)
         assert(scale.category(for: 49) == .normal)
         assert(scale.category(for: 50) == .warning)
         assert(scale.category(for: 79) == .warning)

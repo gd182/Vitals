@@ -9,9 +9,10 @@ import SwiftUI
 
 struct RAMDetailsView: View {
     @EnvironmentObject var vm: SystemViewModel
+    @AppStorage("panelCompact") private var compact = true
     
     var body: some View {
-        VStack(alignment: .leading) {
+        VStack(alignment: .leading, spacing: compact ? 4 : 8) {
             HStack {
                 Text("memory_used")
                 Spacer()
@@ -29,6 +30,6 @@ struct RAMDetailsView: View {
             }
         }
         .font(.caption)
-        .padding(10)
+        .monospacedDigit()
     }
 }

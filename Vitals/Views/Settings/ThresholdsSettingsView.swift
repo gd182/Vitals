@@ -8,14 +8,15 @@
 import SwiftUI
 
 struct ThresholdsSettingsView: View {
+    private var palette = UsagePalette()
     
     @AppStorage("warningThreshold") var warningThreshold: Double = 50
     @AppStorage("criticalThreshold") var criticalThreshold: Double = 80
     
     var body: some View {
-        VStack {
-            Text("settings_tab_thresholds")
+        Form {
             HStack {
+                Circle().fill(palette.color(for: .warning)).frame(width: 8, height: 8)
                 Text("threshold_warning").frame(maxWidth: .infinity, alignment: .leading)
                 Slider(value: $warningThreshold, in: 0...100, step: 1)
                     .onChange(of: warningThreshold) { _, newValue in
@@ -27,6 +28,7 @@ struct ThresholdsSettingsView: View {
                 Text(String(format: "%.0f%%", warningThreshold)).frame(width: 40)
             }
             HStack {
+                Circle().fill(palette.color(for: .critical)).frame(width: 8, height: 8)
                 Text("threshold_critical").frame(maxWidth: .infinity, alignment: .leading)
                 Slider(value: $criticalThreshold, in: 0...100, step: 1)
                     .onChange(of: criticalThreshold) { _, newValue in
@@ -38,6 +40,6 @@ struct ThresholdsSettingsView: View {
                 Text(String(format: "%.0f%%", criticalThreshold)).frame(width: 40)
             }
         }
-        .padding(16)
+        .formStyle(.grouped)
     }
 }

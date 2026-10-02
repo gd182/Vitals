@@ -4,14 +4,16 @@ struct CircularIndicator: View {
     var value: Double?
     var text: String
     var label: LocalizedStringKey
+    @AppStorage("panelCompact") private var compact = true
+    private var palette = UsagePalette()
     @AppStorage("warningThreshold") private var warningThreshold: Double = 50
     @AppStorage("criticalThreshold") private var criticalThreshold: Double = 80
 
     
     var indicatorColor: Color {
         guard let value, value.isFinite else { return .secondary }
-        return UsageColorScale(warning: Float(warningThreshold), critical: Float(criticalThreshold))
-            .category(for: Float(value)).color
+        return palette.color(for: UsageColorScale(warning: Float(warningThreshold), critical: Float(criticalThreshold))
+            .category(for: Float(value)))
     }
 
     private var fraction: Double {
@@ -30,11 +32,14 @@ struct CircularIndicator: View {
                     .stroke(indicatorColor, style: StrokeStyle(lineWidth: 5, lineCap: .round))
                     .rotationEffect(.degrees(-90))
                 Text(text)
-                    .font(.headline)
+                    .font(.system(size: compact ? 11 : 14, weight: .semibold, design: .monospaced))
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.7)
             }
-            .frame(width: 40, height: 40)
+            .frame(width: compact ? 40 : 58, height: compact ? 40 : 58)
             Text(label)
                 .font(.caption)
+                .foregroundStyle(.secondary)
         }
     }
 }

@@ -9,6 +9,7 @@ import SwiftUI
 
 struct GPUIndicatorsView: View {
     @EnvironmentObject var vm: SystemViewModel
+    @AppStorage("panelCompact") private var compact = true
     
     var body: some View {
         HStack {
@@ -17,20 +18,20 @@ struct GPUIndicatorsView: View {
                 text: String(format: "%.0f%%", vm.gpuRenderUtilization),
                 label: "gpu_label_render"
             )
-            .padding()
+            .frame(maxWidth: .infinity)
             CircularIndicator(
                 value: Double(vm.gpuUtilization),
                 text: String(format: "%.0f%%", vm.gpuUtilization),
                 label: "gpu_label_util"
             )
-            .padding()
+            .frame(maxWidth: .infinity)
             CircularIndicator(
                 value: Double(vm.gpuTilerUtilization),
                 text: String(format: "%.0f%%", vm.gpuTilerUtilization),
                 label: "gpu_label_tiler"
             )
-            .padding()
+            .frame(maxWidth: .infinity)
         }
-        .padding(10)
+        .padding(.vertical, compact ? 4 : 8)
     }
 }

@@ -15,6 +15,9 @@ struct GradientLineView: View {
     @AppStorage var transitionWidth: Double
     @AppStorage("warningThreshold") private var warningThreshold: Double = 50
     @AppStorage("criticalThreshold") private var criticalThreshold: Double = 80
+    @AppStorage("panelCompact") private var compact = true
+    @AppStorage("chartFill") private var chartFill = true
+    private var palette = UsagePalette()
     
     init(segments: [Segment], namespace: String) {
             self.segments = segments
@@ -56,14 +59,14 @@ struct GradientLineView: View {
             let colorScale = UsageColorScale(warning: Float(warningThreshold), critical: Float(criticalThreshold))
             let categoryGradient = Gradient(stops: colorScale.gradientStops(
                 points: sourcePoints, width: size.width, transitionWidth: transitionWidth
-            ).map { .init(color: $0.category.color, location: $0.location) })
+            ).map { .init(color: palette.color(for: $0.category), location: $0.location) })
 
-            drawArea(
+            if chartFill { drawArea(
                 context: context,
                 points: points,
                 size: size,
                 categoryGradient: categoryGradient
-            )
+            ) }
 
             let linePath = makePath(points: points)
 
@@ -87,7 +90,7 @@ struct GradientLineView: View {
                 )
             )
         }
-        .frame(height: height)
+        .frame(height: compact ? max(24, height * 0.6) : height)
     }
 
 

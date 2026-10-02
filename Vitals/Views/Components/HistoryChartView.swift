@@ -4,6 +4,7 @@ struct HistoryChartView: View {
     let segments: [Segment]
     let namespace: String
     @AppStorage private var height: Double
+    @AppStorage("panelCompact") private var compact = true
     @State private var cursorIndex: Int?
 
     init(segments: [Segment], namespace: String) {
@@ -35,12 +36,12 @@ struct HistoryChartView: View {
                     let x = lastIndex > 0 ? CGFloat(index) / CGFloat(lastIndex) * geometry.size.width : 0
                     let y = (1 - min(100, max(0, CGFloat(point.value))) / 100) * geometry.size.height
                     Rectangle()
-                        .fill(.white.opacity(0.6))
+                        .fill(Color.primary.opacity(0.5))
                         .frame(width: 1, height: geometry.size.height)
                         .position(x: x, y: geometry.size.height / 2)
                         .allowsHitTesting(false)
                     Circle()
-                        .fill(.white)
+                        .fill(Color.primary)
                         .frame(width: 8, height: 8)
                         .position(x: x, y: y)
                         .allowsHitTesting(false)
@@ -56,7 +57,7 @@ struct HistoryChartView: View {
                 }
             }
         }
-        .frame(height: height)
+        .frame(height: compact ? max(24, height * 0.6) : height)
         .clipped()
     }
 }

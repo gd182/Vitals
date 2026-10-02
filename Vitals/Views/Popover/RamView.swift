@@ -8,6 +8,7 @@
 import SwiftUI
 
 struct RAMView: View {
+    var onSizeChange: ((CGSize) -> Void)? = nil
     @EnvironmentObject var vm: SystemViewModel
     
     @StateObject var config = DashboardConfig(namespace: "RAM")
@@ -20,13 +21,9 @@ struct RAMView: View {
     ]
     
     var body: some View {
-        DashboardView(blocks: blocks, config: config)
+        DashboardView(blocks: blocks, config: config, onSizeChange: onSizeChange)
         .onAppear {
-            let currentIDs = blocks.map { $0.id }
-            config.order = config.order.filter { currentIDs.contains($0) }
-            let newIDs = currentIDs.filter { !config.order.contains($0) }
-            config.order.append(contentsOf: newIDs)
-            
+            config.reconcile(ids: blocks.map(\.id))
         }
     }
 }

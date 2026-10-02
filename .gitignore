@@ -16,6 +16,17 @@ DerivedData/
 *.dSYM.zip
 *.dSYM
 
+# Release output and local signing credentials
+dist/
+*.xcarchive/
+*.p12
+*.pfx
+*.mobileprovision
+*.provisionprofile
+.env
+.env.*
+!.env.example
+
 # Swift Package Manager
 .build/
 .swiftpm/
@@ -55,5 +66,4 @@ playground.xcworkspace
 # Claude Code session data
 .claude/
 
-# Dev tools at root (keep load.py)
-# load.py is a CPU stress tester for development — intentionally tracked
+# test/load.py is an optional CPU stress tool, intentionally tracked.

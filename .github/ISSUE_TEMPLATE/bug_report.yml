@@ -1,0 +1,37 @@
+name: Bug report
+description: Incorrect metrics, crashes, or interface problems
+title: "[Bug]: "
+body:
+  - type: input
+    id: version
+    attributes:
+      label: Vitals version or commit
+      placeholder: "0.1.0 / commit hash"
+    validations:
+      required: true
+  - type: input
+    id: hardware
+    attributes:
+      label: Mac model, processor and GPU
+      description: Include the Intel/Apple chip and GPU model, not your serial number.
+      placeholder: "MacBook Pro, Apple M3 Pro / Intel Core i7 with Radeon GPU"
+    validations:
+      required: true
+  - type: input
+    id: macos
+    attributes:
+      label: macOS version
+    validations:
+      required: true
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: Steps to reproduce
+      description: Include relevant refresh intervals, panel settings and expected versus actual behavior.
+    validations:
+      required: true
+  - type: textarea
+    id: evidence
+    attributes:
+      label: Screenshots or logs
+      description: Remove private process names, paths, credentials and other personal information.

@@ -1,0 +1,16 @@
+name: Feature request
+description: Suggest a focused improvement
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: What problem would this solve?
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed behavior
+      description: Consider CPU, memory, polling cost, and Intel/Apple Silicon differences.
+    validations:
+      required: true

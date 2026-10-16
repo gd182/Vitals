@@ -75,5 +75,23 @@
    <ArchiveAction
       buildConfiguration = "Release"
       revealArchiveInOrganizer = "YES">
+      <PostActions>
+         <ExecutionAction
+            ActionType = "Xcode.IDEStandardExecutionActionsCore.ExecutionActionType.ShellScriptAction">
+            <ActionContent
+               title = "Run Script"
+               scriptText = "# Type a script or drag a script file from your workspace to insert its path.&#10;set -eu&#10;&#10;app=&quot;$ARCHIVE_PATH/Products/Applications/Vitals.app&quot;&#10;version=$(/usr/libexec/PlistBuddy -c \&#10;  &apos;Print :CFBundleShortVersionString&apos; &quot;$app/Contents/Info.plist&quot;)&#10;name=&quot;Vitals-$version-universal-test&quot;&#10;out=&quot;$SRCROOT/dist/$(date +%Y%m%d-%H%M%S)&quot;&#10;mkdir -p &quot;$out&quot;&#10;exec &gt;&quot;$out/package.log&quot; 2&gt;&amp;1&#10;&#10;/usr/bin/lipo &quot;$app/Contents/MacOS/Vitals&quot; -verify_arch arm64&#10;/usr/bin/lipo &quot;$app/Contents/MacOS/Vitals&quot; -verify_arch x86_64&#10;&#10;stage=$(mktemp -d /tmp/VitalsDMG.XXXXXX)&#10;/usr/bin/ditto &quot;$app&quot; &quot;$stage/Vitals.app&quot;&#10;/bin/cp &quot;$SRCROOT/LICENSE&quot; &quot;$stage/LICENSE&quot;&#10;/bin/ln -s /Applications &quot;$stage/Applications&quot;&#10;&#10;/usr/bin/hdiutil create -volname &quot;Vitals $version&quot; \&#10;  -srcfolder &quot;$stage&quot; -format UDZO &quot;$out/$name.dmg&quot;&#10;/usr/bin/hdiutil verify &quot;$out/$name.dmg&quot;&#10;&#10;cd &quot;$out&quot;&#10;/usr/bin/shasum -a 256 &quot;$name.dmg&quot; &gt; &quot;$name.dmg.sha256&quot;&#10;printf &apos;Packaging completed successfully\n&apos;&#10;">
+               <EnvironmentBuildable>
+                  <BuildableReference
+                     BuildableIdentifier = "primary"
+                     BlueprintIdentifier = "0EDFD9A72FE03AC1002062D0"
+                     BuildableName = "Vitals.app"
+                     BlueprintName = "Vitals"
+                     ReferencedContainer = "container:Vitals.xcodeproj">
+                  </BuildableReference>
+               </EnvironmentBuildable>
+            </ActionContent>
+         </ExecutionAction>
+      </PostActions>
    </ArchiveAction>
 </Scheme>

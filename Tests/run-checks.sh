@@ -39,6 +39,16 @@ xcrun swiftc -swift-version 5 -Onone -module-cache-path "$check_dir/swift-cache"
     -o "$check_dir/login-tests"
 "$check_dir/login-tests"
 
+xcrun swiftc -swift-version 5 -Onone \
+    -module-cache-path "$check_dir/swift-cache" \
+    Tests/UpdateCheckerTests.swift \
+    Vitals/Models/GitHubRelease.swift \
+    Vitals/Models/AppVersion.swift \
+    Vitals/Services/GitHubReleaseService.swift \
+    Vitals/Services/UpdateSelector.swift \
+    -o "$check_dir/update-tests"
+"$check_dir/update-tests"
+
 if [[ "${1:-}" == "--ui" ]]; then
     machine_arch=$(uname -m)
     xcodebuild -quiet -project Vitals.xcodeproj -scheme Vitals -configuration Release \

@@ -6,8 +6,19 @@ struct GeneralSettingsView: View {
     @AppStorage("backgroundUpdateInterval") private var backgroundInterval: Double?
     @AppStorage("processUpdateInterval") private var processInterval: Double = 2
     @AppStorage("temperatureUpdateInterval") private var temperatureInterval: Double = 3
+    @AppStorage("includePrereleaseUpdates") private var includePrereleaseUpdates = false
     @EnvironmentObject var langManager: LanguageManager
     @StateObject private var loginItem = LoginItemSettings()
+    @StateObject private var updateChecker = UpdateChecker(
+        currentVersion: Bundle.main.object(
+            forInfoDictionaryKey: "CFBundleShortVersionString"
+        ) as? String,
+        fetchReleases: {
+            try await GitHubReleaseService().fetchReleases()
+        }
+    )
+
+    @State private var updateTask: Task<Void, Never>?
 
     var body: some View {
         Form {
@@ -38,6 +49,36 @@ struct GeneralSettingsView: View {
                 }
                 .pickerStyle(.menu)
             }
+            Section("settings_updates") {
+                Toggle(
+                    "updates_include_prereleases",
+                    isOn: $includePrereleaseUpdates
+                )
+                .disabled(updateTask != nil)
+                HStack {
+                    Button("updates_check") {
+                        guard updateTask == nil else { return }
+                        
+                        let includePrereleases = includePrereleaseUpdates
+
+                        updateTask = Task { @MainActor in
+                            defer { updateTask = nil }
+
+                            await updateChecker.checkForUpdates(
+                                includePrereleases: includePrereleases
+                            )
+                        }
+                    }
+                    .disabled(updateTask != nil)
+
+                    if updateChecker.isChecking {
+                        ProgressView()
+                            .controlSize(.small)
+                    }
+                }
+                updateStatus
+                    .font(.caption)
+            }
             Section {
                 Button("setup_reopen") {
                     NotificationCenter.default.post(name: .init("VitalsShowSetup"), object: nil)
@@ -56,6 +97,41 @@ struct GeneralSettingsView: View {
             Button("OK", role: .cancel) { loginItem.errorMessage = nil }
         } message: {
             Text(verbatim: loginItem.errorMessage ?? "")
+        }
+        .onDisappear {
+            updateTask?.cancel()
+        }
+        .onChange(of: includePrereleaseUpdates) { _, _ in
+            updateChecker.reset()
+        }
+    }
+
+    @ViewBuilder
+    private var updateStatus: some View {
+        switch updateChecker.state {
+        case .idle:
+            EmptyView()
+
+        case .checking:
+            Text("updates_checking")
+                .foregroundStyle(.secondary)
+
+        case .upToDate:
+            Text("updates_up_to_date")
+                .foregroundStyle(.secondary)
+
+        case .updateAvailable(let release):
+            HStack {
+                Text("updates_available")
+                Text(verbatim: release.tagName)
+                    .monospacedDigit()
+                Spacer()
+                Link("updates_open_release", destination: release.htmlUrl)
+            }
+
+        case .failed:
+            Text("updates_failed")
+                .foregroundStyle(.red)
         }
     }
 

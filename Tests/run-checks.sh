@@ -46,6 +46,7 @@ xcrun swiftc -swift-version 5 -Onone \
     Vitals/Models/AppVersion.swift \
     Vitals/Services/GitHubReleaseService.swift \
     Vitals/Services/UpdateSelector.swift \
+    Vitals/ViewModels/UpdateChecker.swift \
     -o "$check_dir/update-tests"
 "$check_dir/update-tests"
 

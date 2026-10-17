@@ -1,0 +1,31 @@
+{
+  "configurations" : [
+    {
+      "id" : "FD8E36B6-4B5C-43E1-A4A8-6AE0E20C6B02",
+      "name" : "Test Scheme Action",
+      "options" : {
+
+      }
+    }
+  ],
+  "defaultOptions" : {
+    "codeCoverage" : false,
+    "performanceAntipatternCheckerEnabled" : true,
+    "targetForVariableExpansion" : {
+      "containerPath" : "container:Vitals.xcodeproj",
+      "identifier" : "0EDFD9A72FE03AC1002062D0",
+      "name" : "Vitals"
+    },
+    "testInteropMode" : "complete"
+  },
+  "testTargets" : [
+    {
+      "target" : {
+        "containerPath" : "container:Vitals.xcodeproj",
+        "identifier" : "0EE8BC3130842EE600FC73FD",
+        "name" : "VitalsTests"
+      }
+    }
+  ],
+  "version" : 1
+}

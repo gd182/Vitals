@@ -17,6 +17,7 @@ struct VitalsApp: App {
             LocalizedRoot(langManager: appDelegate.langManager) {
                 SettingsView()
                     .environmentObject(appDelegate.langManager)
+                    .environmentObject(appDelegate.updateChecker)
             }
         }
     }

@@ -26,6 +26,7 @@ Russian and German without restarting.
 - Choose which menu bar items to show, hide or reorder panel sections, and use a compact or spacious layout.
 - Use a light or dark theme, or follow your Mac's appearance setting.
 - Enable launch at login. Panels close when you switch to another app or desktop.
+- Check GitHub Releases for updates manually, or enable daily checks. You can include pre-release versions; downloads and installation remain manual.
 
 A short setup window opens on the first launch. You can revisit it from settings.
 

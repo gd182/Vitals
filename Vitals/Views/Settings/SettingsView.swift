@@ -76,5 +76,10 @@ struct SettingsView: View {
 }
 
 #Preview {
-    SettingsView().environmentObject(LanguageManager())
+    SettingsView()
+        .environmentObject(LanguageManager())
+        .environmentObject(UpdateChecker(
+            currentVersion: "0.1.0",
+            fetchReleases: { [] }
+        ))
 }

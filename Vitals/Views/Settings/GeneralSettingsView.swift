@@ -7,16 +7,11 @@ struct GeneralSettingsView: View {
     @AppStorage("processUpdateInterval") private var processInterval: Double = 2
     @AppStorage("temperatureUpdateInterval") private var temperatureInterval: Double = 3
     @AppStorage("includePrereleaseUpdates") private var includePrereleaseUpdates = false
+    @AppStorage("automaticUpdateChecks")
+    private var automaticUpdateChecks = false
     @EnvironmentObject var langManager: LanguageManager
     @StateObject private var loginItem = LoginItemSettings()
-    @StateObject private var updateChecker = UpdateChecker(
-        currentVersion: Bundle.main.object(
-            forInfoDictionaryKey: "CFBundleShortVersionString"
-        ) as? String,
-        fetchReleases: {
-            try await GitHubReleaseService().fetchReleases()
-        }
-    )
+    @EnvironmentObject private var updateChecker: UpdateChecker
 
     @State private var updateTask: Task<Void, Never>?
 
@@ -51,25 +46,41 @@ struct GeneralSettingsView: View {
             }
             Section("settings_updates") {
                 Toggle(
+                    "updates_automatic_checks",
+                    isOn: $automaticUpdateChecks
+                )
+                Toggle(
                     "updates_include_prereleases",
                     isOn: $includePrereleaseUpdates
                 )
-                .disabled(updateTask != nil)
+                .disabled(updateTask != nil || updateChecker.isChecking)
                 HStack {
                     Button("updates_check") {
-                        guard updateTask == nil else { return }
+                        guard updateTask == nil && !updateChecker.isChecking else {
+                            return
+                        }
                         
                         let includePrereleases = includePrereleaseUpdates
 
                         updateTask = Task { @MainActor in
                             defer { updateTask = nil }
 
+                            guard !Task.isCancelled,
+                                !updateChecker.isChecking else {
+                                return
+                            }
+
+                            let preferences = UpdatePreferences()
+                            if preferences.automaticChecksEnabled {
+                                preferences.recordAttempt(at: Date())
+                            }
+
                             await updateChecker.checkForUpdates(
                                 includePrereleases: includePrereleases
                             )
                         }
                     }
-                    .disabled(updateTask != nil)
+                    .disabled(updateTask != nil || updateChecker.isChecking)
 
                     if updateChecker.isChecking {
                         ProgressView()

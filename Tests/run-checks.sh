@@ -50,8 +50,13 @@ xcrun swiftc -swift-version 5 -Onone \
     -o "$check_dir/update-tests"
 "$check_dir/update-tests"
 
+machine_arch=$(uname -m)
+xcodebuild -quiet -project Vitals.xcodeproj -scheme Vitals -testPlan Vitals \
+    -configuration Debug -destination "platform=macOS,arch=$machine_arch" \
+    -derivedDataPath "$check_dir/native-tests" \
+    -only-testing:VitalsTests CODE_SIGNING_ALLOWED=NO test
+
 if [[ "${1:-}" == "--ui" ]]; then
-    machine_arch=$(uname -m)
     xcodebuild -quiet -project Vitals.xcodeproj -scheme Vitals -configuration Release \
         -destination "platform=macOS,arch=$machine_arch" \
         -derivedDataPath "$check_dir/build" CODE_SIGNING_ALLOWED=NO build

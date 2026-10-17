@@ -13,15 +13,41 @@
 /* Begin PBXFileReference section */
 		0E51DE78303DAC6900C0DB78 /* Localizable.xcstrings */ = {isa = PBXFileReference; lastKnownFileType = text.json.xcstrings; path = Localizable.xcstrings; sourceTree = "<group>"; };
 		0EDFD9CA2FE047CE002062D0 /* Vitals.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Vitals.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		0EE8BC3230842EE600FC73FD /* VitalsTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = VitalsTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		0EE8BC3B3084311200FC73FD /* Vitals.xctestplan */ = {isa = PBXFileReference; lastKnownFileType = text; path = Vitals.xctestplan; sourceTree = "<group>"; };
 /* End PBXFileReference section */
+
+/* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
+		0EE8BC3A30842FD500FC73FD /* Exceptions for "Vitals" folder in "VitalsTests" target */ = {
+			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
+			membershipExceptions = (
+				Models/AppVersion.swift,
+				Models/GitHubRelease.swift,
+				Models/UpdateCheckPolicy.swift,
+				Models/UpdatePreferences.swift,
+				Services/AutomaticUpdateScheduler.swift,
+				Services/UpdateSelector.swift,
+				ViewModels/UpdateChecker.swift,
+			);
+			target = 0EE8BC3130842EE600FC73FD /* VitalsTests */;
+		};
+/* End PBXFileSystemSynchronizedBuildFileExceptionSet section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
 		0EDFD9AA2FE03AC1002062D0 /* Vitals */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
+			exceptions = (
+				0EE8BC3A30842FD500FC73FD /* Exceptions for "Vitals" folder in "VitalsTests" target */,
+			);
 			explicitFileTypes = {
 				Bridge/SystemMonitor.mm = sourcecode.cpp.objcpp.preprocessed;
 			};
 			path = Vitals;
+			sourceTree = "<group>";
+		};
+		0EE8BC3330842EE600FC73FD /* VitalsTests */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			path = VitalsTests;
 			sourceTree = "<group>";
 		};
 /* End PBXFileSystemSynchronizedRootGroup section */
@@ -34,15 +60,25 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		0EE8BC2F30842EE600FC73FD /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
 		0EDFD99F2FE03AC1002062D0 = {
 			isa = PBXGroup;
 			children = (
+				0EE8BC3B3084311200FC73FD /* Vitals.xctestplan */,
 				0EDFD9AA2FE03AC1002062D0 /* Vitals */,
 				0EDFD9CA2FE047CE002062D0 /* Vitals.app */,
 				0E51DE78303DAC6900C0DB78 /* Localizable.xcstrings */,
+				0EE8BC3230842EE600FC73FD /* VitalsTests.xctest */,
+				0EE8BC3330842EE600FC73FD /* VitalsTests */,
 			);
 			sourceTree = "<group>";
 		};
@@ -71,6 +107,28 @@
 			productReference = 0EDFD9CA2FE047CE002062D0 /* Vitals.app */;
 			productType = "com.apple.product-type.application";
 		};
+		0EE8BC3130842EE600FC73FD /* VitalsTests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 0EE8BC3830842EE600FC73FD /* Build configuration list for PBXNativeTarget "VitalsTests" */;
+			buildPhases = (
+				0EE8BC2E30842EE600FC73FD /* Sources */,
+				0EE8BC2F30842EE600FC73FD /* Frameworks */,
+				0EE8BC3030842EE600FC73FD /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			fileSystemSynchronizedGroups = (
+				0EE8BC3330842EE600FC73FD /* VitalsTests */,
+			);
+			name = VitalsTests;
+			packageProductDependencies = (
+			);
+			productName = VitalsTests;
+			productReference = 0EE8BC3230842EE600FC73FD /* VitalsTests.xctest */;
+			productType = "com.apple.product-type.bundle.unit-test";
+		};
 /* End PBXNativeTarget section */
 
 /* Begin PBXProject section */
@@ -78,12 +136,15 @@
 			isa = PBXProject;
 			attributes = {
 				BuildIndependentTargetsInParallel = 1;
-				LastSwiftUpdateCheck = 2650;
+				LastSwiftUpdateCheck = 2710;
 				LastUpgradeCheck = 2700;
 				TargetAttributes = {
 					0EDFD9A72FE03AC1002062D0 = {
 						CreatedOnToolsVersion = 26.5;
 						LastSwiftMigration = 2650;
+					};
+					0EE8BC3130842EE600FC73FD = {
+						CreatedOnToolsVersion = 27.1;
 					};
 				};
 			};
@@ -104,6 +165,7 @@
 			projectRoot = "";
 			targets = (
 				0EDFD9A72FE03AC1002062D0 /* Vitals */,
+				0EE8BC3130842EE600FC73FD /* VitalsTests */,
 			);
 		};
 /* End PBXProject section */
@@ -117,10 +179,24 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		0EE8BC3030842EE600FC73FD /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXResourcesBuildPhase section */
 
 /* Begin PBXSourcesBuildPhase section */
 		0EDFD9A42FE03AC1002062D0 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		0EE8BC2E30842EE600FC73FD /* Sources */ = {
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
@@ -323,6 +399,42 @@
 			};
 			name = Release;
 		};
+		0EE8BC3630842EE600FC73FD /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				GENERATE_INFOPLIST_FILE = YES;
+				MACOSX_DEPLOYMENT_TARGET = 14.6;
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.gd182.VitalsTests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				STRING_CATALOG_GENERATE_SYMBOLS = NO;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_EMIT_LOC_STRINGS = NO;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+			};
+			name = Debug;
+		};
+		0EE8BC3730842EE600FC73FD /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				GENERATE_INFOPLIST_FILE = YES;
+				MACOSX_DEPLOYMENT_TARGET = 14.6;
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.gd182.VitalsTests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				STRING_CATALOG_GENERATE_SYMBOLS = NO;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_EMIT_LOC_STRINGS = NO;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+			};
+			name = Release;
+		};
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
@@ -340,6 +452,15 @@
 			buildConfigurations = (
 				0EDFD9B42FE03AC2002062D0 /* Debug */,
 				0EDFD9B52FE03AC2002062D0 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		0EE8BC3830842EE600FC73FD /* Build configuration list for PBXNativeTarget "VitalsTests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				0EE8BC3630842EE600FC73FD /* Debug */,
+				0EE8BC3730842EE600FC73FD /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;

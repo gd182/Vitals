@@ -1,5 +1,5 @@
 //
-//  AppDelegater.swift
+//  AppDelegate.swift
 //  Vitals
 //
 //  Created by Алексей on 6/17/26.
@@ -19,12 +19,28 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate, NSWindowD
     var popoverGPU = NSPopover()
 
     var langManager = LanguageManager()
+    let updateChecker = UpdateChecker(
+        currentVersion: Bundle.main.object(
+            forInfoDictionaryKey: "CFBundleShortVersionString"
+        ) as? String,
+        fetchReleases: {
+            try await GitHubReleaseService().fetchReleases()
+        }
+    )
+    private lazy var automaticUpdateScheduler = AutomaticUpdateScheduler(
+        checker: updateChecker,
+        preferences: UpdatePreferences()
+    )
     private var defaultsObserver: AnyCancellable?
     private var menuBarPreferences: MenuBarPreferences?
     private var setupObserver: AnyCancellable?
     private var lifecycleObservers = Set<AnyCancellable>()
     private let workspaceNotificationCenter: NotificationCenter
     private(set) var setupWindow: NSWindow?
+    private var updatePreferencesSnapshot: (
+        enabled: Bool,
+        prereleases: Bool
+    )?
 
     override convenience init() {
         self.init(workspaceNotificationCenter: NSWorkspace.shared.notificationCenter)
@@ -49,7 +65,10 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate, NSWindowD
         updateMenuBar()
         defaultsObserver = NotificationCenter.default.publisher(for: UserDefaults.didChangeNotification)
             .receive(on: RunLoop.main)
-            .sink { [weak self] _ in self?.updateMenuBar() }
+            .sink { [weak self] _ in
+                self?.updateMenuBar()
+                self?.updateAutomaticUpdatePreferences()
+            }
         setupObserver = NotificationCenter.default.publisher(for: .init("VitalsShowSetup"))
             .receive(on: RunLoop.main)
             .sink { [weak self] _ in self?.showSetup() }
@@ -85,6 +104,33 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate, NSWindowD
         if !UserDefaults.standard.bool(forKey: "hasCompletedSetup") {
             showSetup()
         }
+
+        workspaceNotificationCenter.publisher(
+            for: NSWorkspace.didWakeNotification
+        )
+        .receive(on: RunLoop.main)
+        .sink { [weak self] _ in
+            self?.refreshAutomaticUpdates()
+        }
+        .store(in: &lifecycleObservers)
+
+        updateChecker.$state
+            .map { state -> Bool in
+                if case .checking = state {
+                    return true
+                }
+                return false
+            }
+            .removeDuplicates()
+            .dropFirst()
+            .filter { !$0 }
+            .receive(on: RunLoop.main)
+            .sink { [weak self] _ in
+                self?.refreshAutomaticUpdates()
+            }
+            .store(in: &lifecycleObservers)
+
+        updateAutomaticUpdatePreferences()
     }
 
     func showSetup() {
@@ -251,5 +297,35 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate, NSWindowD
             guard let popover, !popover.isShown else { return }
             popover.contentViewController = nil
         }
+    }
+
+    private func refreshAutomaticUpdates() {
+        automaticUpdateScheduler.refresh(
+            includePrereleases: UserDefaults.standard.bool(
+                forKey: "includePrereleaseUpdates"
+            )
+        )
+    }
+
+    func applicationWillTerminate(_ notification: Notification) {
+        automaticUpdateScheduler.stop()
+    }
+
+    private func updateAutomaticUpdatePreferences() {
+        let defaults = UserDefaults.standard
+        let enabled = defaults.bool(forKey: "automaticUpdateChecks")
+        let prereleases = defaults.bool(forKey: "includePrereleaseUpdates")
+
+        if let snapshot = updatePreferencesSnapshot,
+        snapshot.enabled == enabled,
+        snapshot.prereleases == prereleases {
+            return
+        }
+
+        updatePreferencesSnapshot = (
+            enabled: enabled,
+            prereleases: prereleases
+        )
+        refreshAutomaticUpdates()
     }
 }

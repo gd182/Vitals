@@ -184,6 +184,7 @@ struct PopoverSmokeTests {
                         settingsWindow.contentViewController = NSHostingController(rootView:
                             SettingsView(initialSection: section)
                                 .environmentObject(delegate.langManager)
+                                .environmentObject(delegate.updateChecker)
                                 .environment(\.locale, Locale(identifier: language))
                                 .preferredColorScheme(theme == "dark" ? .dark : .light)
                         )
@@ -202,6 +203,7 @@ struct PopoverSmokeTests {
                 settingsWindow.contentViewController = NSHostingController(rootView:
                     SettingsView(initialSection: .appearance, appearanceTab: tab)
                         .environmentObject(delegate.langManager)
+                        .environmentObject(delegate.updateChecker)
                         .environment(\.locale, Locale(identifier: "ru"))
                 )
                 settingsWindow.makeKeyAndOrderFront(nil)

@@ -34,6 +34,23 @@ Login-item checks inject a fake service and cover registration, approval,
 external status changes and errors. They never register a real login item.
 Verify actual launch after login manually using an installed, signed app.
 
+The script also runs the hostless `VitalsTests` target through Swift Testing.
+Its automatic-update tests cover daily scheduling boundaries, preference
+persistence and delaying retries after a network failure. They also check timer
+scheduling, cancellation and rescheduling, prevent duplicate background requests,
+and verify that stopping the scheduler cancels its request without cancelling a
+manual one. The timer callback test advances an injected clock and fires a
+captured timer, without waiting for the daily interval. Each persistence test
+uses its own disposable defaults suite. These tests do not launch Vitals or make
+real network requests. Actual sleep/wake handling and the settings-to-scheduler
+connection still need manual verification. Run the tests directly with
+Product > Test in Xcode, or:
+
+```sh
+xcodebuild -project Vitals.xcodeproj -scheme Vitals -testPlan Vitals \
+  -destination 'platform=macOS' test
+```
+
 Build a Universal binary to validate both architectures:
 
 ```sh

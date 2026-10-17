@@ -49,6 +49,7 @@ Carthage/Build/
 Thumbs.db
 
 # Xcode auto-generated
+/buildServer.json
 *.moved-aside
 *.pbxuser
 !default.pbxuser

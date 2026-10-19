@@ -1,5 +1,14 @@
 # Application Checks
 
+For detailed, non-GUI process measurements, use `test/profile_process.py` as
+described in the [performance guide](../docs/PERFORMANCE.md). It is a separate
+manual tool, not a benchmark run by the application or CI. Its focused Python
+checks run with:
+
+```sh
+python3 -B -m unittest discover -s Tests -p test_profile_process.py -v
+```
+
 Run from a logged-in macOS desktop with Xcode's command-line tools selected:
 
 ```sh

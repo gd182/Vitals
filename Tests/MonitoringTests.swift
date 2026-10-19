@@ -65,6 +65,7 @@ final class SensorReader {
 }
 
 @main
+@MainActor
 struct MonitoringTests {
     static func pump(_ seconds: Double) { RunLoop.main.run(until: Date().addingTimeInterval(seconds)) }
     static func waitUntil(_ condition: () -> Bool) {
@@ -74,6 +75,8 @@ struct MonitoringTests {
     }
 
     static func main() {
+        testMenuBarMetrics()
+
         let defaults = UserDefaults(suiteName: "VitalsTests.\(UUID())")!
         var values: [String: Any] = ["updateInterval": 0.5, "backgroundUpdateInterval": 2,
             "processUpdateInterval": 1, "temperatureUpdateInterval": 1]
@@ -152,5 +155,91 @@ struct MonitoringTests {
         assert(points.first?.timestamp == Date(timeIntervalSince1970: 940 * 3))
         assert(points.last?.timestamp == Date(timeIntervalSince1970: 999 * 3))
         print("Monitoring, lifecycle, preferences and history checks passed")
+    }
+
+    static func testMenuBarMetrics() {
+        let metrics = MenuBarMetrics()
+
+        metrics.update(cpu: 10, ram: 20, gpu: 30)
+
+        var cpuChanges = 0
+        var ramChanges = 0
+        var gpuChanges = 0
+
+        let cpuSubscription = metrics.cpu.objectWillChange.sink {
+            cpuChanges += 1
+        }
+
+        let ramSubscription = metrics.ram.objectWillChange.sink {
+            ramChanges += 1
+        }
+
+        let gpuSubscription = metrics.gpu.objectWillChange.sink {
+            gpuChanges += 1
+        }
+
+        metrics.update(cpu: 15, ram: 20, gpu: 30)
+
+        assert(metrics.cpu.value == 15)
+        assert(metrics.ram.value == 20)
+        assert(metrics.gpu.value == 30)
+
+        assert(cpuChanges == 1)
+        assert(ramChanges == 0)
+        assert(gpuChanges == 0)
+
+        metrics.cpu.update(from: 10.1)
+        let changesBeforeSameValue = cpuChanges
+
+        metrics.cpu.update(from: 10.4)
+
+        assert(metrics.cpu.value == 10)
+        assert(cpuChanges == changesBeforeSameValue)
+
+        metrics.cpu.update(from: 10.6)
+
+        assert(metrics.cpu.value == 11)
+        assert(cpuChanges == changesBeforeSameValue + 1)
+
+        metrics.cpu.update(from: 42)
+        let beforeNaN = cpuChanges
+
+        metrics.cpu.update(from: .nan)
+
+        assert(metrics.cpu.value == 0)
+        assert(cpuChanges == beforeNaN + 1)
+
+        metrics.cpu.update(from: 42)
+        let beforeInfinity = cpuChanges
+
+        metrics.cpu.update(from: .infinity)
+
+        assert(metrics.cpu.value == 0)
+        assert(cpuChanges == beforeInfinity + 1)
+
+        metrics.cpu.update(from: 42)
+        let beforeOverflow = cpuChanges
+
+        metrics.cpu.update(from: Float.greatestFiniteMagnitude)
+
+        assert(metrics.cpu.value == 0)
+        assert(cpuChanges == beforeOverflow + 1)
+
+        let beforeRepeatedReset = cpuChanges
+
+        metrics.cpu.update(from: .nan)
+        metrics.cpu.update(from: .infinity)
+        metrics.cpu.update(from: Float.greatestFiniteMagnitude)
+
+        assert(metrics.cpu.value == 0)
+        assert(cpuChanges == beforeRepeatedReset)
+
+        withExtendedLifetime((
+            cpuSubscription,
+            ramSubscription,
+            gpuSubscription
+        )) {}
+
+        print("MenuBarMetrics checks passed")
     }
 }

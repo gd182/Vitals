@@ -102,6 +102,9 @@ GitHub Actions настроен на Xcode 26.2, сборку для обеих 
 графического интерфейса. Показания датчиков и поведение окон всё равно нужно
 проверять на реальном Mac.
 
+В [протоколе замеров производительности](docs/PERFORMANCE.md) описано, как
+сравнивать расход ресурсов до и после изменений. Пока документ на английском.
+
 Для ручной проверки под нагрузкой есть `test/load.py`: он нагружает все ядра
 процессора, пока его не остановить сочетанием Ctrl+C. Для него нужен Python 3.
 Ни приложение, ни CI не запускают этот скрипт автоматически.
@@ -109,8 +112,8 @@ GitHub Actions настроен на Xcode 26.2, сборку для обеих 
 ## Как это устроено
 
 <p>
-  <img src="https://skillicons.dev/icons?i=swift" width="40" height="40" alt="Swift" />
-  <img src="https://skillicons.dev/icons?i=cpp" width="40" height="40" alt="C++" />
+  <a href="https://www.swift.org/"><img src="https://raw.githubusercontent.com/danielcranney/profileme-dev/main/public/icons/skills/swift-colored.svg" width="36" height="36" alt="Swift" title="Swift" /></a>
+  <a href="https://isocpp.org/"><img src="https://raw.githubusercontent.com/danielcranney/profileme-dev/main/public/icons/skills/cplusplus-colored.svg" width="36" height="36" alt="C++" title="C++" /></a>
 </p>
 
 Интерфейс написан на SwiftUI, а системные показатели собирает код на C++20.

@@ -98,14 +98,17 @@ needs a manual check. Local checks have passed with Xcode 27; GitHub Actions is
 configured to use Xcode 26.2, build both architectures and run tests without a GUI.
 Hardware readings and desktop interactions still need to be checked on a real Mac.
 
+The [performance measurement guide](docs/PERFORMANCE.md) describes repeatable
+baseline measurements before changing the collectors or UI.
+
 For manual CPU load testing, `test/load.py` can keep all cores busy until you
 stop it with Ctrl+C. It requires Python 3 and is never started by the app or CI.
 
 ## Under the Hood
 
 <p>
-  <img src="https://skillicons.dev/icons?i=swift" width="40" height="40" alt="Swift" />
-  <img src="https://skillicons.dev/icons?i=cpp" width="40" height="40" alt="C++" />
+  <a href="https://www.swift.org/"><img src="https://raw.githubusercontent.com/danielcranney/profileme-dev/main/public/icons/skills/swift-colored.svg" width="36" height="36" alt="Swift" title="Swift" /></a>
+  <a href="https://isocpp.org/"><img src="https://raw.githubusercontent.com/danielcranney/profileme-dev/main/public/icons/skills/cplusplus-colored.svg" width="36" height="36" alt="C++" title="C++" /></a>
 </p>
 
 The interface is built with SwiftUI. C++20 collects system metrics, and an

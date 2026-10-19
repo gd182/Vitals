@@ -68,3 +68,6 @@ playground.xcworkspace
 .claude/
 
 # test/load.py is an optional CPU stress tool, intentionally tracked.
+
+# Local process measurement reports
+/test/tests_results/

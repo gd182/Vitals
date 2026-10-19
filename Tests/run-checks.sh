@@ -14,6 +14,7 @@ xcrun swiftc -swift-version 5 -Onone -module-cache-path "$check_dir/swift-cache"
     Tests/MonitoringTests.swift Vitals/Models/MonitoringPreferences.swift \
     Vitals/Models/ProcessUsage.swift Vitals/Models/UsageColorScale.swift Vitals/Utils/CircularBuffer.swift \
     Vitals/Utils/HistoryData.swift Vitals/ViewModels/SystemViewModel.swift \
+    Vitals/Services/MonitorWorker.swift \
     -o "$check_dir/monitoring-tests"
 "$check_dir/monitoring-tests"
 

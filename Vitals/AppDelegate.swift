@@ -17,6 +17,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate, NSWindowD
     var popoverCPU = NSPopover()
     var popoverRAM = NSPopover()
     var popoverGPU = NSPopover()
+    private var subscriptions: [MenuBarModule: AnyCancellable] = [:]
 
     var langManager = LanguageManager()
     let updateChecker = UpdateChecker(
@@ -170,31 +171,60 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate, NSWindowD
         let preferences = MenuBarPreferences()
         guard preferences != menuBarPreferences else { return }
         menuBarPreferences = preferences
-        updateStatusItem(&statusItemCPU, enabled: preferences.cpu, module: "CPU",
+        updateStatusItem(&statusItemCPU, enabled: preferences.cpu, module: MenuBarModule.cpu,
                          action: #selector(toggleCPUPopover), popover: popoverCPU)
-        updateStatusItem(&statusItemRAM, enabled: preferences.ram, module: "RAM",
+        updateStatusItem(&statusItemRAM, enabled: preferences.ram, module: MenuBarModule.ram,
                          action: #selector(toggleRAMPopover), popover: popoverRAM)
-        updateStatusItem(&statusItemGPU, enabled: preferences.gpu, module: "GPU",
+        updateStatusItem(&statusItemGPU, enabled: preferences.gpu, module: MenuBarModule.gpu,
                          action: #selector(toggleGPUPopover), popover: popoverGPU)
     }
 
-    private func updateStatusItem(_ item: inout NSStatusItem?, enabled: Bool, module: String,
+    private func updateStatusItem(_ item: inout NSStatusItem?, enabled: Bool, module: MenuBarModule,
                                   action: Selector, popover: NSPopover) {
         if !enabled {
             popover.close()
+            subscriptions[module]?.cancel()
+            subscriptions[module] = nil
             if let existing = item { NSStatusBar.system.removeStatusItem(existing) }
             item = nil
             return
         }
         guard item == nil else { return }
         let statusItem = NSStatusBar.system.statusItem(withLength: 36)
-        let label = NSHostingView(rootView: MenuBarLabelView(metrics: vm.menuBarMetrics, module: module))
-        label.frame = NSRect(x: 0, y: 0, width: 36, height: 22)
-        label.autoresizingMask = [.width, .height]
-        statusItem.button?.addSubview(label)
-        statusItem.button?.action = action
-        statusItem.button?.target = self
-        statusItem.button?.toolTip = module
+        let metric: MenuBarMetric
+        switch module {
+            case .cpu:
+                metric = vm.menuBarMetrics.cpu
+            case .ram:
+                metric = vm.menuBarMetrics.ram
+            case .gpu:
+                metric = vm.menuBarMetrics.gpu
+        }
+
+        guard let button = statusItem.button else {
+            NSStatusBar.system.removeStatusItem(statusItem)
+            return
+        }
+
+        button.action = action
+        button.target = self
+        button.toolTip = module.title
+        button.imagePosition = .imageOnly
+
+        subscriptions[module] = metric.$value
+            .sink { [weak button] percent in
+                guard let button else {
+                    return
+                }
+
+                button.image = MenuBarImageRenderer.render(
+                    module: module,
+                    percent: percent
+                )
+                button.setAccessibilityLabel(
+                    "\(module.title) \(percent)%"
+                )
+            }
         item = statusItem
     }
     

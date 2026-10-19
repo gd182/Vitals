@@ -2,21 +2,36 @@ import Combine
 import Foundation
 import AppKit
 
-final class MenuBarMetrics: ObservableObject {
-    @Published private(set) var cpu = 0
-    @Published private(set) var ram = 0
-    @Published private(set) var gpu = 0
-
-    func update(cpu: Float, ram: Float, gpu: Float) {
-        func percent(_ value: Float) -> Int { value.isFinite ? Int(value.rounded()) : 0 }
-        let nextCPU = percent(cpu), nextRAM = percent(ram), nextGPU = percent(gpu)
-        if self.cpu != nextCPU { self.cpu = nextCPU }
-        if self.ram != nextRAM { self.ram = nextRAM }
-        if self.gpu != nextGPU { self.gpu = nextGPU }
+@MainActor
+final class MenuBarMetric: ObservableObject {
+    @Published private(set) var value: Int = 0
+    func update(from newValue: Float) {
+        let rounded = newValue.rounded()
+        let nextValue: Int = rounded.isFinite
+            ? (Int(exactly: rounded) ?? 0)
+            : 0
+        guard value != nextValue else {
+            return
+        }
+        value = nextValue
     }
 }
 
-final class SystemViewModel: ObservableObject {
+@MainActor
+final class MenuBarMetrics {
+    let cpu = MenuBarMetric()
+    let ram = MenuBarMetric()
+    let gpu = MenuBarMetric()
+
+    func update(cpu: Float, ram: Float, gpu: Float) {
+        self.cpu.update(from: cpu)
+        self.ram.update(from: ram)
+        self.gpu.update(from: gpu)
+    }
+}
+
+@MainActor
+final class SystemViewModel: @MainActor ObservableObject {
     let objectWillChange = ObservableObjectPublisher()
     let menuBarMetrics = MenuBarMetrics()
     private(set) var cpuUsage: Float = 0
@@ -51,8 +66,7 @@ final class SystemViewModel: ObservableObject {
             cpuProcessGeneration += 1
             if !isMonitoringProcessesCPU {
                 topProcessesByCPU = []
-                let monitor = self.monitor
-                monitorQueue.async { monitor.resetProcessCPUHistory() }
+                monitorWorker.perform { monitor in monitor.resetProcessCPUHistory() }
             }
         }
     }
@@ -68,8 +82,7 @@ final class SystemViewModel: ObservableObject {
         didSet { if !isMonitoringTemperature { lastTemperatureRead = nil } }
     }
 
-    private let monitorQueue = DispatchQueue(label: "com.vitals.monitor", qos: .utility)
-    private let monitor = SystemMonitor()
+    private let monitorWorker = MonitorWorker()
     private let defaults: UserDefaults
     private var preferences: MonitoringPreferences
     private var timer: Timer?
@@ -90,37 +103,46 @@ final class SystemViewModel: ObservableObject {
         self.defaults = defaults
         preferences = MonitoringPreferences(defaults: defaults)
         applyPreferences()
+        // These observers deliver on .main; preserve synchronous actor-isolated handling.
         intervalObserver = NotificationCenter.default.addObserver(
             forName: UserDefaults.didChangeNotification, object: nil, queue: .main
         ) { [weak self] _ in
-            guard let self else { return }
-            let next = MonitoringPreferences(defaults: self.defaults)
-            guard next != self.preferences else { return }
-            self.objectWillChange.send()
-            self.preferences = next
-            self.applyPreferences()
-            self.startTimer()
+            MainActor.assumeIsolated {
+                guard let self else { return }
+                let next = MonitoringPreferences(defaults: self.defaults)
+                guard next != self.preferences else { return }
+                self.objectWillChange.send()
+                self.preferences = next
+                self.applyPreferences()
+                self.startTimer()
+            }
         }
         let workspace = NSWorkspace.shared.notificationCenter
         sleepObservers.append(workspace.addObserver(
             forName: NSWorkspace.willSleepNotification, object: nil, queue: .main
         ) { [weak self] _ in
-            self?.isSleeping = true
-            self?.timer?.invalidate()
-            self?.timer = nil
-            self?.timerInterval = nil
+            MainActor.assumeIsolated {
+                self?.isSleeping = true
+                self?.timer?.invalidate()
+                self?.timer = nil
+                self?.timerInterval = nil
+            }
         })
         sleepObservers.append(workspace.addObserver(
             forName: NSWorkspace.didWakeNotification, object: nil, queue: .main
         ) { [weak self] _ in
-            guard let self else { return }
-            self.isSleeping = false
-            self.lastCPUProcessRead = nil
-            self.lastRAMProcessRead = nil
-            self.lastTemperatureRead = nil
-            self.cpuProcessGeneration += 1
-            self.startTimer()
-            self.sample()
+            MainActor.assumeIsolated {
+                guard let self else {
+                    return
+                }
+                self.isSleeping = false
+                self.lastCPUProcessRead = nil
+                self.lastRAMProcessRead = nil
+                self.lastTemperatureRead = nil
+                self.cpuProcessGeneration += 1
+                self.startTimer()
+                self.sample()
+            }
         })
         startTimer()
         sample()
@@ -158,7 +180,13 @@ final class SystemViewModel: ObservableObject {
         guard interval != timerInterval else { return }
         timer?.invalidate()
         timerInterval = interval
-        let nextTimer = Timer(timeInterval: interval, repeats: true) { [weak self] _ in self?.sample() }
+        // Keep this timer on the main run loop for the isolation check below.
+        let nextTimer = Timer(timeInterval: interval, repeats: true) {
+            [weak self] _ in
+                MainActor.assumeIsolated {
+                    self?.sample()
+                }
+        }
         nextTimer.tolerance = min(0.5, interval * 0.1)
         RunLoop.main.add(nextTimer, forMode: .common)
         timer = nextTimer
@@ -184,8 +212,7 @@ final class SystemViewModel: ObservableObject {
         }
         if readRAM { lastRAMProcessRead = now }
         if readTemperature { lastTemperatureRead = now }
-        let monitor = self.monitor
-        monitorQueue.async { [weak self, monitor] in
+        monitorWorker.perform { [weak self] monitor in
             autoreleasepool {
                 monitor.update()
                 let cpu = monitor.cpuStats().average

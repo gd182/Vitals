@@ -1,102 +1,56 @@
 # Application Checks
 
-For detailed, non-GUI process measurements, use `test/profile_process.py` as
-described in the [performance guide](../docs/PERFORMANCE.md). It is a separate
-manual tool, not a benchmark run by the application or CI. Its focused Python
-checks run with:
-
-```sh
-python3 -B -m unittest discover -s Tests -p test_profile_process.py -v
-```
-
-Run from a logged-in macOS desktop with Xcode's command-line tools selected:
+Run on macOS with Xcode's command-line tools selected:
 
 ```sh
 bash Tests/run-checks.sh
 ```
 
-The native checks sample real CPU and memory counters, check that Mach send-right
-references do not grow, and verify process CPU percentages against a busy thread.
-Process enumeration requires an unrestricted local process, not a coding sandbox.
-The Swift checks use a fake monitor and volatile preferences, without modifying
-the app's settings. They cover background/foreground cadence, on-demand process
-and temperature polling, stale results after closing, slow samples, deallocation,
-threshold defaults, and bounded timestamped history. Swift assertions must stay
-enabled; the script deliberately uses `-Onone` for these checks.
+The script runs native collector checks, standalone Swift checks with test
+doubles, and the hostless Swift Testing target `VitalsTests`. Assertions must
+remain enabled (`-Onone` for standalone Swift checks).
 
-The sensor checks exercise Intel Core/Xeon names, the configured M1-M5 families,
-unrecognized names and future generation names, without opening the SMC device.
-An absent temperature sample must clear the previous value instead of displaying
-zero or a stale temperature.
+## UI Checks
 
-Color checks cover custom thresholds, exact threshold boundaries, cubic curve
-crossings, single-sample peaks and wide transitions that must not overlap.
-The color-test executable accepts an optional PNG path to render a preview with
-the actual Canvas graph and circular indicators.
-
-Settings checks cover all eight combinations of menu modules, including the
-CPU fallback when all stored toggles are disabled. They use volatile defaults.
-Layout checks use a separate disposable defaults suite for reordering, block
-visibility, reconciliation and reset, leaving application preferences untouched.
-
-Login-item checks inject a fake service and cover registration, approval,
-external status changes and errors. They never register a real login item.
-Verify actual launch after login manually using an installed, signed app.
-
-The script also runs the hostless `VitalsTests` target through Swift Testing.
-Its automatic-update tests cover daily scheduling boundaries, preference
-persistence and delaying retries after a network failure. They also check timer
-scheduling, cancellation and rescheduling, prevent duplicate background requests,
-and verify that stopping the scheduler cancels its request without cancelling a
-manual one. The timer callback test advances an injected clock and fires a
-captured timer, without waiting for the daily interval. Each persistence test
-uses its own disposable defaults suite. These tests do not launch Vitals or make
-real network requests. Actual sleep/wake handling and the settings-to-scheduler
-connection still need manual verification. Run the tests directly with
-Product > Test in Xcode, or:
-
-```sh
-xcodebuild -project Vitals.xcodeproj -scheme Vitals -testPlan Vitals \
-  -destination 'platform=macOS' test
-```
-
-Build a Universal binary to validate both architectures:
-
-```sh
-xcodebuild -project Vitals.xcodeproj -scheme Vitals -configuration Release \
-  -destination 'generic/platform=macOS' -derivedDataPath /tmp/VitalsUniversalBuild \
-  ARCHS='arm64 x86_64' ONLY_ACTIVE_ARCH=NO CODE_SIGNING_ALLOWED=NO build
-lipo -archs /tmp/VitalsUniversalBuild/Build/Products/Release/Vitals.app/Contents/MacOS/Vitals
-```
-
-Cross-compilation checks both code paths; real Intel hardware is still needed
-to verify its SMC sensors and GPU driver statistics. Unsupported sensor data is
-not guaranteed to become available through fallback probing. The deployment
-target remains macOS 14.6 or newer.
-
-To include a Release build and real AppKit popover lifecycle checks:
+From an active, logged-in macOS desktop:
 
 ```sh
 bash Tests/run-checks.sh --ui
 ```
 
-The UI test temporarily shows CPU/RAM/GPU popovers and terminates its own copy.
-It also checks module removal and restoration, setup-window close/reopen, and
-watches automatic closing on Space changes and application deactivation,
-checks that switching modules closes the previous panel, and
-writes settings snapshots in English, Russian and German to the temporary
-directory. Launch-argument overrides avoid changing saved module preferences
-or marking the real app's setup complete.
-Workspace notifications are injected so real desktop activity cannot interrupt
-programmatically opened panels; actual app/Space switching remains a manual check.
-Panel snapshots cover CPU, RAM, GPU, and changing the GPU panel width and theme
-while it is open. Chart previews use the same Canvas renderer as live charts.
-Compact panels use content-driven height capped by available screen space;
-oversized content remains scrollable. Color checks include RGB persistence
-conversion and invalid-value fallback. UI snapshots also cover custom colors
-and the separate appearance tabs.
-It disables animations and uses application-defined popover behavior because programmatic opening does
-not establish the focus of a real status-button click. It exercises the normal
-close delegate and reopening, but does not simulate outside mouse clicks.
-Real sleep/wake, animated closing, and transient-popover focus should also be checked manually.
-Temporary build artifacts remain in the printed directory for inspection.
+This also builds a Release app, exercises popovers and settings, and saves
+screenshots. Temporary artifacts remain in the directory printed by the script.
+Launch-argument overrides keep smoke-test settings separate from saved app settings.
+
+## Coverage and Limits
+
+- Native counters, process CPU accuracy and Mach port reference stability.
+- Monitoring cadence, process loading, stale results, lifecycle and bounded history.
+- Sensor classification, chart colors, layout preferences and login-item states.
+- Release decoding, version selection and automatic-update scheduling with mocked networking.
+- UI smoke checks cover panel switching, module visibility, settings and localization.
+
+Real sensors, login registration, sleep/wake, outside-click dismissal and desktop
+switching still require manual verification. Programmatic UI checks disable
+animations and inject workspace notifications. Cross-compilation is not a
+substitute for real Intel hardware testing.
+
+## Editor Support
+
+`MonitoringChecks` is a separate command-line target for `Tests/MonitoringTests.swift`
+and its dependencies. Never add its fake collector to the app target. When changing
+dependencies, keep its Sources phase aligned with `run-checks.sh`.
+
+The shared `Vitals` scheme builds the helper for development/testing, but does not
+run it or include it in the app archive. With `xcode-build-server`, build the
+`Vitals` scheme in its configured DerivedData directory, then restart the Swift
+language server if compiler settings remain stale.
+
+## Profiling Tool
+
+See the [measurement guide](../docs/PERFORMANCE.md) for `test/profile_process.py`.
+Its tests run separately:
+
+```sh
+python3 -B -m unittest discover -s Tests -p test_profile_process.py -v
+```

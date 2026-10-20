@@ -71,3 +71,6 @@ playground.xcworkspace
 
 # Local process measurement reports
 /test/tests_results/
+
+# Local planning notes
+/NOTES.local.md

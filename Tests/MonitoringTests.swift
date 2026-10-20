@@ -100,6 +100,10 @@ struct MonitoringTests {
 
         var vm: SystemViewModel? = SystemViewModel(defaults: defaults)
         weak var weakVM = vm
+
+        assert(vm!.cpuProcessState == .inactive)
+        assert(vm!.ramProcessState == .inactive)
+
         var changes = 0
         var cancellable: AnyCancellable? = vm!.objectWillChange.sink { changes += 1 }
         pump(0.8)
@@ -108,21 +112,37 @@ struct MonitoringTests {
         assert(SensorReader.shared.readCount == 0 && changes == 0)
         let resetsBeforeOpening = SystemMonitor.count(\.resets)
         vm!.setPopoverVisible(true, module: "CPU")
+        let changesBeforeEnabling: Int = changes
         vm!.isMonitoringProcessesCPU = true
         vm!.isMonitoringProcessesRAM = true
+        assert(vm!.cpuProcessState == .loading)
+        assert(vm!.ramProcessState == .loading)
+        assert(changes == changesBeforeEnabling + 2)
         vm!.isMonitoringTemperature = true
-        pump(1.7)
-        assert((1...2).contains(SystemMonitor.count(\.cpuReads)))
+        waitUntil { vm!.ramProcessState == .ready }
+        assert(vm!.cpuProcessState == .loading)
+        let changesBeforeSamples = changes
+        waitUntil { vm!.cpuProcessState == .ready }
+        let sampleChanges = changes - changesBeforeSamples
+        print("Sample notifications: \(sampleChanges)")
+        assert(SystemMonitor.count(\.cpuReads) == 2)
         assert((1...2).contains(SystemMonitor.count(\.ramReads)))
         assert((1...2).contains(SensorReader.shared.readCount))
-        assert(changes >= 3 && changes <= 4)
+
         assert(vm!.topProcessesByCPU.first?.name == "CPU test")
         assert(vm!.cpuTemperature == 45)
         SensorReader.shared.setTemperature(nil)
         waitUntil { vm!.cpuTemperature == nil }
+        waitUntil { vm!.ramProcessState == ProcessListState.ready }
+        waitUntil { vm!.cpuProcessState == ProcessListState.ready }
+
         vm!.setPopoverVisible(false, module: "CPU")
         vm!.isMonitoringProcessesRAM = false
-        assert(vm!.topProcessesByCPU.isEmpty && vm!.topProcessesByRAM.isEmpty)
+
+        assert(vm!.cpuProcessState == ProcessListState.inactive)
+        assert(vm!.ramProcessState == ProcessListState.inactive)
+        assert(vm!.topProcessesByCPU.isEmpty)
+        assert(vm!.topProcessesByRAM.isEmpty)
         let before = SystemMonitor.count(\.updates)
         pump(0.8)
         assert(SystemMonitor.count(\.updates) == before)
@@ -145,6 +165,11 @@ struct MonitoringTests {
         assert(weakVM == nil)
         _ = cancellable
 
+        testRAMMonitoring()
+        testCPUMonitoring()
+        testCPUPendingSampleCancellation()
+        testMonitoringSleepWake()
+
         // History stays bounded and preserves real sample dates with mixed polling intervals.
         var history = HistoryData()
         for i in 0..<1000 { history.append(Float(i % 100), timestamp: Date(timeIntervalSince1970: Double(i * 3))) }
@@ -154,6 +179,7 @@ struct MonitoringTests {
         assert(points.count == 60)
         assert(points.first?.timestamp == Date(timeIntervalSince1970: 940 * 3))
         assert(points.last?.timestamp == Date(timeIntervalSince1970: 999 * 3))
+
         print("Monitoring, lifecycle, preferences and history checks passed")
     }
 
@@ -241,5 +267,288 @@ struct MonitoringTests {
         )) {}
 
         print("MenuBarMetrics checks passed")
+    }
+
+    static func testRAMMonitoring() {
+        SystemMonitor.lock.lock()
+        SystemMonitor.delay = 0
+        SystemMonitor.lock.unlock()
+
+        let defaults = UserDefaults(
+            suiteName: "VitalsTests.RAM.\(UUID())"
+        )!
+
+        defaults.setVolatileDomain(
+            [
+                "updateInterval": 60.0,
+                "backgroundUpdateInterval": 60.0,
+                "processUpdateInterval": 60.0,
+                "temperatureUpdateInterval": 60.0
+            ],
+            forName: UserDefaults.argumentDomain
+        )
+
+        let vm = SystemViewModel(defaults: defaults)
+
+        assert(vm.ramProcessState == .inactive)
+
+        vm.setPopoverVisible(true, module: "RAM")
+        vm.isMonitoringProcessesRAM = true
+
+        assert(vm.ramProcessState == .loading)
+
+        waitUntil {
+            vm.ramProcessState == .ready
+        }
+
+        assert(
+            vm.topProcessesByRAM.contains {
+                $0.name == "RAM test"
+            }
+        )
+
+        vm.setPopoverVisible(false, module: "RAM")
+
+        assert(vm.ramProcessState == .inactive)
+        assert(vm.topProcessesByRAM.isEmpty)
+
+        print("RAM monitoring checks passed")
+    }
+
+    static func testCPUMonitoring() {
+        SystemMonitor.lock.lock()
+        SystemMonitor.delay = 0
+        SystemMonitor.lock.unlock()
+
+        let defaults = UserDefaults(
+            suiteName: "VitalsTests.CPU.\(UUID())"
+        )!
+
+        defaults.setVolatileDomain(
+            [
+                "updateInterval": 60.0,
+                "backgroundUpdateInterval": 60.0,
+                "processUpdateInterval": 60.0,
+                "temperatureUpdateInterval": 60.0
+            ],
+            forName: UserDefaults.argumentDomain
+        )
+
+        let vm = SystemViewModel(defaults: defaults)
+
+        assert(vm.cpuProcessState == .inactive)
+        assert(vm.ramProcessState == .inactive)
+
+        let cpuReadsBefore = SystemMonitor.count(\.cpuReads)
+
+        vm.setPopoverVisible(true, module: "CPU")
+        vm.isMonitoringProcessesCPU = true
+
+        assert(vm.cpuProcessState == .loading)
+        assert(vm.ramProcessState == .inactive)
+
+        let startTime = Date()
+
+        waitUntil {
+            vm.cpuProcessState == .ready
+        }
+
+        let elapsed = Date().timeIntervalSince(startTime)
+
+        assert(elapsed < 3.0)
+
+        assert(
+            vm.topProcessesByCPU.contains {
+                $0.name == "CPU test"
+            }
+        )
+
+        let cpuReadsAfterWarmup = SystemMonitor.count(\.cpuReads)
+
+        assert(cpuReadsAfterWarmup == cpuReadsBefore + 2)
+
+        pump(1.0)
+
+        assert(
+            SystemMonitor.count(\.cpuReads) ==
+            cpuReadsAfterWarmup
+        )
+
+        assert(vm.cpuProcessState == .ready)
+
+        vm.setPopoverVisible(false, module: "CPU")
+
+        assert(vm.cpuProcessState == .inactive)
+        assert(vm.topProcessesByCPU.isEmpty)
+
+        print("CPU monitoring checks passed")
+    }
+
+    static func testCPUPendingSampleCancellation() {
+        SystemMonitor.lock.lock()
+        SystemMonitor.delay = 0
+        SystemMonitor.lock.unlock()
+
+        let defaults = UserDefaults(
+            suiteName: "VitalsTests.CPUCancellation.\(UUID())"
+        )!
+
+        defaults.setVolatileDomain(
+            [
+                "updateInterval": 60.0,
+                "backgroundUpdateInterval": 60.0,
+                "processUpdateInterval": 60.0,
+                "temperatureUpdateInterval": 60.0
+            ],
+            forName: UserDefaults.argumentDomain
+        )
+
+        let vm = SystemViewModel(defaults: defaults)
+
+        assert(vm.cpuProcessState == .inactive)
+        assert(vm.ramProcessState == .inactive)
+
+        vm.setPopoverVisible(true, module: "CPU")
+        vm.setPopoverVisible(true, module: "RAM")
+
+        vm.isMonitoringProcessesCPU = true
+        vm.isMonitoringProcessesRAM = true
+
+        assert(vm.cpuProcessState == .loading)
+        assert(vm.ramProcessState == .loading)
+
+        waitUntil {
+            vm.ramProcessState == .ready
+        }
+
+        assert(vm.cpuProcessState == .loading)
+
+        vm.setPopoverVisible(false, module: "CPU")
+
+        let cpuReadsBefore = SystemMonitor.count(\.cpuReads)
+
+        pump(0.8)
+
+        assert(
+            SystemMonitor.count(\.cpuReads) ==
+            cpuReadsBefore
+        )
+
+        assert(vm.cpuProcessState == .inactive)
+        assert(vm.topProcessesByCPU.isEmpty)
+
+        vm.setPopoverVisible(true, module: "CPU")
+        vm.isMonitoringProcessesCPU = true
+
+        assert(vm.cpuProcessState == .loading)
+
+        waitUntil {
+            vm.cpuProcessState == .ready
+        }
+
+        assert(
+            SystemMonitor.count(\.cpuReads) ==
+            cpuReadsBefore + 2
+        )
+
+        assert(
+            vm.topProcessesByCPU.contains {
+                $0.name == "CPU test"
+            }
+        )
+
+        vm.setPopoverVisible(false, module: "CPU")
+        vm.setPopoverVisible(false, module: "RAM")
+
+        assert(vm.cpuProcessState == .inactive)
+        assert(vm.ramProcessState == .inactive)
+
+        assert(vm.topProcessesByCPU.isEmpty)
+        assert(vm.topProcessesByRAM.isEmpty)
+
+        print("CPU pending sample cancellation checks passed")
+    }
+
+    static func testMonitoringSleepWake() {
+        SystemMonitor.lock.lock()
+        SystemMonitor.delay = 0
+        SystemMonitor.lock.unlock()
+
+        let defaults = UserDefaults(
+            suiteName: "VitalsTests.SleepWake.\(UUID())"
+        )!
+
+        defaults.setVolatileDomain(
+            [
+                "updateInterval": 0.5,
+                "backgroundUpdateInterval": 0.5,
+                "processUpdateInterval": 60.0,
+                "temperatureUpdateInterval": 60.0
+            ],
+            forName: UserDefaults.argumentDomain
+        )
+
+        let vm = SystemViewModel(defaults: defaults)
+
+        assert(vm.cpuProcessState == .inactive)
+
+        // Start CPU monitoring.
+        vm.setPopoverVisible(true, module: "CPU")
+        vm.isMonitoringProcessesCPU = true
+
+        assert(vm.cpuProcessState == .loading)
+
+        waitUntil {
+            vm.cpuProcessState == .ready
+        }
+
+        assert(
+            vm.topProcessesByCPU.contains {
+                $0.name == "CPU test"
+            }
+        )
+
+        NSWorkspace.shared.notificationCenter.post(
+            name: NSWorkspace.willSleepNotification,
+            object: nil
+        )
+
+        let updatesBeforeSleep = SystemMonitor.count(\.updates)
+        pump(0.8)
+        assert(
+            SystemMonitor.count(\.updates) ==
+            updatesBeforeSleep
+        )
+
+        let cpuReadsBeforeWake = SystemMonitor.count(\.cpuReads)
+
+        NSWorkspace.shared.notificationCenter.post(
+            name: NSWorkspace.didWakeNotification,
+            object: nil
+        )
+
+        assert(vm.cpuProcessState == .loading)
+
+        waitUntil {
+            vm.cpuProcessState == .ready
+        }
+
+        assert(
+            SystemMonitor.count(\.cpuReads) ==
+            cpuReadsBeforeWake + 2
+        )
+
+        assert(
+            vm.topProcessesByCPU.contains {
+                $0.name == "CPU test"
+            }
+        )
+
+        vm.setPopoverVisible(false, module: "CPU")
+
+        assert(vm.cpuProcessState == .inactive)
+        assert(vm.topProcessesByCPU.isEmpty)
+
+        print("Monitoring sleep/wake checks passed")
     }
 }

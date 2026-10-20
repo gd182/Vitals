@@ -5,11 +5,19 @@ struct CPUProcessesView: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 4) {
-            if vm.topProcessesByCPU.isEmpty {
-                Text("panel_no_processes").font(.caption).foregroundStyle(.secondary)
-            }
-            ForEach(vm.topProcessesByCPU) { process in
-                ProcessRow(process: process, value: String(format: "%.1f%%", process.value))
+            switch vm.cpuProcessState {
+                case .inactive:
+                    EmptyView()
+                case .loading:
+                    ProgressView()
+                case .ready:
+                    if vm.topProcessesByCPU.isEmpty {
+                        Text("panel_no_processes").font(.caption).foregroundStyle(.secondary)
+                    } else {
+                        ForEach(vm.topProcessesByCPU) { process in
+                            ProcessRow(process: process, value: String(format: "%.1f%%", process.value))
+                        }
+                    }
             }
         }
         .monospacedDigit()

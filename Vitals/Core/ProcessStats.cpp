@@ -10,6 +10,7 @@
 #include <cstdint>
 #include <libproc.h>
 #include <sys/resource.h>
+#include <mach/mach_time.h>
 
 namespace Vitals
 {
@@ -39,6 +40,15 @@ namespace Vitals
     {
         if (count <= 0)
             return {};
+        static const mach_timebase_info_data_t timebase = [] {
+            mach_timebase_info_data_t info{};
+            if (mach_timebase_info(&info) != KERN_SUCCESS) {
+                return mach_timebase_info_data_t{};
+            }
+            return info;
+        }();
+        if (timebase.numer == 0 || timebase.denom == 0)
+            return {};
         int mib[] = {CTL_KERN, KERN_PROC, KERN_PROC_ALL};
         size_t size = 0;
         if (sysctl(mib, 3, nullptr, &size, nullptr, 0) != 0)
@@ -66,7 +76,9 @@ namespace Vitals
             if (cpuFirstRun_ || elapsedNs <= 0 || previous == prevCpuNs_.end()
                 || previous->second.startTime != usage.ri_proc_start_abstime || cpuNs < previous->second.cpuNs)
                 continue;
-            const double percent = double(cpuNs - previous->second.cpuNs) / elapsedNs * 100;
+            const double deltaTicks = cpuNs - previous->second.cpuNs;
+            const double deltaNanoseconds = deltaTicks * timebase.numer / timebase.denom;
+            const double percent = deltaNanoseconds / elapsedNs * 100;
             addToTop(top, pid, proc.kp_proc.p_comm, percent, count, sortAscending);
         }
         prevCpuNs_.swap(current);

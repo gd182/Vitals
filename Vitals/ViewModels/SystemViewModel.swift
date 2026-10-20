@@ -47,7 +47,9 @@ final class SystemViewModel: @MainActor ObservableObject {
     private(set) var gpuTilerHistory = HistoryData()
     private(set) var gpuANEHistory = HistoryData()
     private(set) var topProcessesByCPU: [ProcessUsage] = []
+    private(set) var cpuProcessState: ProcessListState = .inactive
     private(set) var topProcessesByRAM: [ProcessUsage] = []
+    private(set) var ramProcessState: ProcessListState = .inactive
     private(set) var cpuTemperature: Float?
     private(set) var memoryTotalBytes: UInt64 = 0
     private(set) var gpuUtilization: Float = 0
@@ -58,24 +60,82 @@ final class SystemViewModel: @MainActor ObservableObject {
     private(set) var gpuVramTotal: UInt64 = 0
     private(set) var warningThreshold: Float = 50
     private(set) var criticalThreshold: Float = 80
+    private var processSampleRequested: Bool = false
+    private var cpuWarmupTimer: Timer? = nil
+
+    private func resetWarmupTimer() {
+        cpuWarmupTimer?.invalidate()
+        cpuWarmupTimer = nil
+    }
+
+    private func scheduleCPUWarmup(generation: Int) {
+        resetWarmupTimer()
+
+        let timer = Timer(
+            timeInterval: 0.5,
+            repeats: false
+        ) { [weak self] _ in
+            MainActor.assumeIsolated {
+                guard let self,
+                    self.isMonitoringProcessesCPU,
+                    !self.isSleeping,
+                    generation == self.cpuProcessGeneration,
+                    self.cpuProcessState == .loading
+                else {
+                    return
+                }
+
+                self.cpuWarmupTimer = nil
+                self.requestProcessSample()
+            }
+        }
+
+        cpuWarmupTimer = timer
+
+        RunLoop.main.add(timer, forMode: .common)
+    }
+
+    private func requestProcessSample() {
+        guard !isSleeping, !sampleInFlight else {
+            processSampleRequested = true
+            return
+        }
+        processSampleRequested = false
+        sample()
+    }
 
     var isMonitoringProcessesCPU = false {
         didSet {
             guard oldValue != isMonitoringProcessesCPU else { return }
+            resetWarmupTimer()
+            objectWillChange.send()
+            cpuProcessState = isMonitoringProcessesCPU == true
+                ? .loading
+                : .inactive
             lastCPUProcessRead = nil
             cpuProcessGeneration += 1
             if !isMonitoringProcessesCPU {
                 topProcessesByCPU = []
                 monitorWorker.perform { monitor in monitor.resetProcessCPUHistory() }
+            } else {
+                requestProcessSample()
             }
         }
     }
     var isMonitoringProcessesRAM = false {
         didSet {
             guard oldValue != isMonitoringProcessesRAM else { return }
+            objectWillChange.send()
+            ramProcessState = isMonitoringProcessesRAM == true
+                ? .loading
+                : .inactive
             lastRAMProcessRead = nil
             ramProcessGeneration += 1
-            if !isMonitoringProcessesRAM { topProcessesByRAM = [] }
+            if !isMonitoringProcessesRAM {
+                topProcessesByRAM = []
+            } else {
+                requestProcessSample()
+            }
         }
     }
     var isMonitoringTemperature = false {
@@ -124,6 +184,7 @@ final class SystemViewModel: @MainActor ObservableObject {
             MainActor.assumeIsolated {
                 self?.isSleeping = true
                 self?.timer?.invalidate()
+                self?.resetWarmupTimer()
                 self?.timer = nil
                 self?.timerInterval = nil
             }
@@ -140,6 +201,10 @@ final class SystemViewModel: @MainActor ObservableObject {
                 self.lastRAMProcessRead = nil
                 self.lastTemperatureRead = nil
                 self.cpuProcessGeneration += 1
+                if self.isMonitoringProcessesCPU {
+                    self.objectWillChange.send()
+                    self.cpuProcessState = .loading
+                }
                 self.startTimer()
                 self.sample()
             }
@@ -150,6 +215,7 @@ final class SystemViewModel: @MainActor ObservableObject {
 
     deinit {
         timer?.invalidate()
+        cpuWarmupTimer?.invalidate()
         if let intervalObserver { NotificationCenter.default.removeObserver(intervalObserver) }
         for observer in sleepObservers { NSWorkspace.shared.notificationCenter.removeObserver(observer) }
     }
@@ -201,7 +267,10 @@ final class SystemViewModel: @MainActor ObservableObject {
         func isDue(_ last: TimeInterval?, interval: TimeInterval) -> Bool {
             last.map { now - $0 >= interval } ?? true
         }
-        let readCPU = isMonitoringProcessesCPU && isDue(lastCPUProcessRead, interval: preferences.processInterval)
+        let cpuProcessInterval: TimeInterval = cpuProcessState == .loading
+            ? min(0.5, preferences.processInterval)
+            : preferences.processInterval
+        let readCPU = isMonitoringProcessesCPU && isDue(lastCPUProcessRead, interval: cpuProcessInterval)
         let readRAM = isMonitoringProcessesRAM && isDue(lastRAMProcessRead, interval: preferences.processInterval)
         let readTemperature = isMonitoringTemperature && isDue(lastTemperatureRead, interval: preferences.temperatureInterval)
         let cpuGeneration = cpuProcessGeneration, ramGeneration = ramProcessGeneration
@@ -249,12 +318,26 @@ final class SystemViewModel: @MainActor ObservableObject {
                     self.gpuANEHistory.append(gpu.aneUtilization, timestamp: timestamp)
                     if self.isMonitoringProcessesCPU, cpuGeneration == self.cpuProcessGeneration, let processesCPU {
                         self.topProcessesByCPU = processesCPU
+                        if !resetCPU {
+                            resetWarmupTimer()
+                            cpuProcessState = .ready
+                        } else {
+                            self.scheduleCPUWarmup(generation: cpuGeneration)
+                        }
                     }
                     if self.isMonitoringProcessesRAM, ramGeneration == self.ramProcessGeneration, let processesRAM {
                         self.topProcessesByRAM = processesRAM
+                        ramProcessState = .ready
                     }
                     if self.isMonitoringTemperature, readTemperature { self.cpuTemperature = temperature }
                     self.menuBarMetrics.update(cpu: cpu.total, ram: memory.usedPercent, gpu: gpu.utilization)
+                    if !isMonitoringProcessesCPU && !isMonitoringProcessesRAM {
+                        processSampleRequested = false
+                    } else {
+                        if processSampleRequested {
+                            self.requestProcessSample()
+                        }
+                    }
                 }
             }
         }

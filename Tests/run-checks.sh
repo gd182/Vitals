@@ -4,7 +4,7 @@ set -eu
 cd "$(dirname "$0")/.."
 check_dir=$(mktemp -d "${TMPDIR:-/tmp}/vitals-checks.XXXXXX")
 
-xcrun clang++ -std=c++17 -O2 -I Vitals/Core Tests/CoreMetricsTests.cpp \
+xcrun clang++ -std=gnu++20 -O2 -I Vitals/Core Tests/CoreMetricsTests.cpp \
     Vitals/Core/CPUStats.cpp Vitals/Core/MemoryStats.cpp \
     Vitals/Core/GPUStats.cpp Vitals/Core/ProcessStats.cpp \
     -framework IOKit -framework CoreFoundation -o "$check_dir/core-tests"
@@ -15,6 +15,7 @@ xcrun swiftc -swift-version 5 -Onone -module-cache-path "$check_dir/swift-cache"
     Vitals/Models/ProcessUsage.swift Vitals/Models/UsageColorScale.swift Vitals/Utils/CircularBuffer.swift \
     Vitals/Utils/HistoryData.swift Vitals/ViewModels/SystemViewModel.swift \
     Vitals/Services/MonitorWorker.swift \
+    Vitals/Models/ProcessListState.swift \
     -o "$check_dir/monitoring-tests"
 "$check_dir/monitoring-tests"
 

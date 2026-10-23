@@ -36,9 +36,34 @@
     return { usage.totalBytes, usage.usedBytes, usage.usedPercent };
 }
 
+- (ObjCMemoryPressure)memoryPressure {
+    auto pressure = _memory.getMemoryPressure();
+    if (!pressure) {
+        return ObjCMemoryPressureUnknown;
+    }
+    switch (pressure.value()) {
+        case Vitals::MemoryPressure::normal:
+            return ObjCMemoryPressureNormal;
+        case Vitals::MemoryPressure::warning:
+            return ObjCMemoryPressureWarning;
+        case Vitals::MemoryPressure::critical:
+            return ObjCMemoryPressureCritical;
+        default:
+            return ObjCMemoryPressureUnknown;
+    }
+}
+
 - (ObjCGPUUsage)gpuUsage {
     auto usage = _gpu.getUsage();
     return { usage.utilization, usage.renderUtilization, usage.tilerUtilization, usage.aneUtilization, usage.vramUsed, usage.vramTotal};
+}
+
+- (ObjCSwapUsage)swapUsage {
+    auto usage = _memory.getSwapUsage();
+    if (!usage) {
+        return {0,0, false};
+    }
+    return {usage->totalBytes, usage->usedBytes, true};
 }
 
 - (NSArray *)topProcessesByCPU {

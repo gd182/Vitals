@@ -1,4 +1,19 @@
 import Foundation
+import SwiftUI
+
+@MainActor
+private struct RAMIndicatorPreferencesProbe {
+    @AppStorage private var storedStyle: RAMIndicatorStyle
+
+    init(defaults: UserDefaults) {
+        _storedStyle = AppStorage(wrappedValue: .ring, "ramIndicatorStyle", store: defaults)
+    }
+
+    var style: RAMIndicatorStyle {
+        get { storedStyle }
+        nonmutating set { storedStyle = newValue }
+    }
+}
 
 @main
 struct SettingsPreferencesTests {
@@ -30,6 +45,30 @@ struct SettingsPreferencesTests {
         assert(layout.order == ["b", "a", "d"] && !layout.isVisible(id: "b"))
         layout.reset(ids: ["a", "b", "d"])
         assert(layout.order == ["a", "b", "d"] && layout.isVisible(id: "b"))
+        testRAMIndicatorStyle()
         print("Menu-bar preferences and accessibility fallback checks passed")
+    }
+
+    @MainActor private static func testRAMIndicatorStyle() {
+        let suite = "VitalsRAMIndicatorTests.\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: suite)!
+        defer { defaults.removePersistentDomain(forName: suite) }
+
+        assert(RAMIndicatorPreferencesProbe(defaults: defaults).style == .ring)
+        for style in [RAMIndicatorStyle.ring, .value] {
+            let writer = RAMIndicatorPreferencesProbe(defaults: defaults)
+            writer.style = style
+            assert(defaults.string(forKey: "ramIndicatorStyle") == style.rawValue)
+            assert(RAMIndicatorPreferencesProbe(defaults: defaults).style == style)
+        }
+        for invalid: Any in ["future-mode", "", 1] {
+            defaults.set(invalid, forKey: "ramIndicatorStyle")
+            assert(RAMIndicatorPreferencesProbe(defaults: defaults).style == .ring)
+        }
+        let reset = RAMIndicatorPreferencesProbe(defaults: defaults)
+        reset.style = .ring
+        assert(defaults.string(forKey: "ramIndicatorStyle") == "ring")
+        assert(RAMIndicatorPreferencesProbe(defaults: defaults).style == .ring)
+        print("RAM indicator persistence, unknown value and reset checks passed")
     }
 }

@@ -7,6 +7,11 @@ struct AppearanceSettingsView: View {
     @AppStorage("panelCompact") private var compact = true
     @AppStorage("panelSectionTitles") private var sectionTitles = true
     @AppStorage("chartFill") private var chartFill = true
+    @AppStorage("ramShowSwap") private var showSwap = true
+    @AppStorage("ramShowMemoryPressure") private var showMemoryPressure = true
+    @AppStorage("ramIndicatorStyle")
+        private var ramIndicatorStyle: RAMIndicatorStyle = .ring
+
     private var palette = UsagePalette()
 
     @State private var tab = 0
@@ -42,6 +47,22 @@ struct AppearanceSettingsView: View {
                 .pickerStyle(.segmented)
                 Toggle("panel_section_titles", isOn: $sectionTitles)
                 Toggle("chart_fill", isOn: $chartFill)
+                Section("RAM") {
+                    Picker("ram_indicator_style", selection: $ramIndicatorStyle) {
+                        Text("ram_indicator_ring")
+                            .tag(RAMIndicatorStyle.ring)
+                        Text("ram_indicator_value")
+                            .tag(RAMIndicatorStyle.value)
+                    }
+                    Toggle("memory_swap_used", isOn: $showSwap)
+                    Toggle("memory_pressure", isOn: $showMemoryPressure)
+                    Button {
+                            showSwap = true
+                            showMemoryPressure = true
+                            ramIndicatorStyle = .ring
+                        } label: { Image(systemName: "arrow.counterclockwise") }
+                        .help("panel_reset")
+                }
             } else if tab == 1 {
                 Section("usage_colors") {
                     ColorPicker("usage_normal", selection: palette.binding(for: .normal), supportsOpacity: false)

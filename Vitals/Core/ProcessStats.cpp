@@ -4,8 +4,10 @@
 //
 
 #include "ProcessStats.hpp"
+#include "ProcessNames.hpp"
 
 #include <algorithm>
+#include <string>
 #include <sys/sysctl.h>
 #include <cstdint>
 #include <libproc.h>
@@ -16,7 +18,7 @@ namespace Vitals
 {
     namespace {
         void addToTop(std::vector<ProcessInfo>& top, int pid, const char* name,
-                      double value, size_t count, bool ascending)
+                      double value, size_t count, bool ascending, uint64_t startTime)
         {
             const auto position = std::lower_bound(top.begin(), top.end(), value,
                 [ascending](const ProcessInfo& process, double candidate) {
@@ -24,9 +26,16 @@ namespace Vitals
                 });
             if (position == top.end() && top.size() >= count)
                 return;
-            top.insert(position, {pid, name, value});
+            top.insert(position, {pid, name, value, startTime});
             if (top.size() > count)
                 top.pop_back();
+        }
+
+        void resolveProcessNames(std::vector<ProcessInfo>& processes)
+        {
+            for (auto& process : processes) {
+                process.name = Detail::resolveProcessName(process.pid, process.name, process.startTime);
+            }
         }
     }
 
@@ -79,11 +88,13 @@ namespace Vitals
             const double deltaTicks = cpuNs - previous->second.cpuNs;
             const double deltaNanoseconds = deltaTicks * timebase.numer / timebase.denom;
             const double percent = deltaNanoseconds / elapsedNs * 100;
-            addToTop(top, pid, proc.kp_proc.p_comm, percent, count, sortAscending);
+            addToTop(top, pid, proc.kp_proc.p_comm, percent,
+                    count, sortAscending, usage.ri_proc_start_abstime);
         }
         prevCpuNs_.swap(current);
         prevCpuTime_ = now;
         cpuFirstRun_ = false;
+        resolveProcessNames(top);
         return top;
     }
 
@@ -126,6 +137,7 @@ namespace Vitals
                 continue;
 
             uint64_t memory = 0;
+            uint64_t startTime = 0;
             rusage_info_v2 ri{};
             errno = 0;
 
@@ -133,6 +145,7 @@ namespace Vitals
 
             if (rusageResult == 0) {
                 memory = ri.ri_phys_footprint;
+                startTime = ri.ri_proc_start_abstime;
             }
             else {
                 proc_taskinfo ti{};
@@ -150,9 +163,10 @@ namespace Vitals
                 continue;
             }
 
-            addToTop(temp, pid, proc.kp_proc.p_comm, static_cast<double>(memory), count, sortAscending);
+            addToTop(temp, pid, proc.kp_proc.p_comm,
+                    static_cast<double>(memory), count, sortAscending, startTime);
         }
-
+        resolveProcessNames(temp);
         return temp;
     }
 }

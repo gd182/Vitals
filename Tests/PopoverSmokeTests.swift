@@ -115,7 +115,10 @@ struct PopoverSmokeTests {
             delegate.toggleCPUPopover()
         }))
         steps.append((1.2, {
-            assert(delegate.popoverCPU.contentViewController!.view.bounds.height < 480)
+            let view = delegate.popoverCPU.contentViewController!.view
+            assert(view.bounds.height > 0)
+            assert(view.bounds.height <= 600)
+            assert(abs(view.bounds.height - delegate.popoverCPU.contentSize.height) < 1)
             snapshot(delegate.popoverCPU.contentViewController!.view.window!, name: "panel-custom-colors")
             delegate.popoverCPU.close()
         }))

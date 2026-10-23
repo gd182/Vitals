@@ -13,6 +13,7 @@
 #include <vector>
 #include <unordered_map>
 #include <chrono>
+#include <cstdint>
 
 namespace Vitals
 {
@@ -21,6 +22,7 @@ namespace Vitals
         int pid;
         std::string name;
         double value;
+        uint64_t startTime = 0;
     };
 
     class ProcessStats

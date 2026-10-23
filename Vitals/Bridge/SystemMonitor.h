@@ -39,11 +39,26 @@ typedef struct {
     uint64_t vramTotal;
 } ObjCGPUUsage;
 
+typedef struct {
+    uint64_t totalBytes;
+    uint64_t usedBytes;
+    BOOL available;
+} ObjCSwapUsage;
+
+typedef NS_ENUM(NSInteger, ObjCMemoryPressure) {
+    ObjCMemoryPressureUnknown = 0,
+    ObjCMemoryPressureNormal,
+    ObjCMemoryPressureWarning,
+    ObjCMemoryPressureCritical,
+};
+
 @interface SystemMonitor : NSObject
 - (double)cpuUsage;
 - (ObjCCPUStatsResult)cpuStats;
 - (ObjCMemoryUsage)memoryUsage;
+- (ObjCMemoryPressure)memoryPressure;
 - (ObjCGPUUsage)gpuUsage;
+- (ObjCSwapUsage)swapUsage;
 - (NSArray *)topProcessesByCPU;
 - (NSArray *)topProcessesByRAM;
 - (void)resetProcessCPUHistory;

@@ -37,6 +37,9 @@ final class SystemViewModel: @MainActor ObservableObject {
     private(set) var cpuUsage: Float = 0
     private(set) var memoryUsedBytes: UInt64 = 0
     private(set) var memoryPercent: Float = 0
+    private(set) var swapTotalBytes: UInt64? = nil
+    private(set) var swapUsedBytes: UInt64? = nil
+    private(set) var memoryPressure: ObjCMemoryPressure = .unknown
     private(set) var cpuUser: Float = 0
     private(set) var cpuSystem: Float = 0
     private(set) var cpuIdle: Float = 0
@@ -232,7 +235,7 @@ final class SystemViewModel: @MainActor ObservableObject {
             }
         }
         startTimer()
-        if visible { sample() }
+        if visible { requestProcessSample() }
     }
 
     private func applyPreferences() {
@@ -272,6 +275,7 @@ final class SystemViewModel: @MainActor ObservableObject {
             : preferences.processInterval
         let readCPU = isMonitoringProcessesCPU && isDue(lastCPUProcessRead, interval: cpuProcessInterval)
         let readRAM = isMonitoringProcessesRAM && isDue(lastRAMProcessRead, interval: preferences.processInterval)
+        let readRAMDetails = visiblePopovers.contains("RAM")
         let readTemperature = isMonitoringTemperature && isDue(lastTemperatureRead, interval: preferences.temperatureInterval)
         let cpuGeneration = cpuProcessGeneration, ramGeneration = ramProcessGeneration
         let resetCPU = readCPU && sampledCPUProcessGeneration != cpuGeneration
@@ -286,6 +290,8 @@ final class SystemViewModel: @MainActor ObservableObject {
                 monitor.update()
                 let cpu = monitor.cpuStats().average
                 let memory = monitor.memoryUsage()
+                let memorySwap: ObjCSwapUsage? = readRAMDetails ? monitor.swapUsage() : nil
+                let pressure: ObjCMemoryPressure? = readRAMDetails ? monitor.memoryPressure() : nil
                 let gpu = monitor.gpuUsage()
                 if resetCPU { monitor.resetProcessCPUHistory() }
                 let processesCPU = readCPU ? ProcessUsage.decode(monitor.topProcessesByCPU() as NSArray) : nil
@@ -305,6 +311,21 @@ final class SystemViewModel: @MainActor ObservableObject {
                     self.memoryUsedBytes = memory.usedBytes
                     self.memoryPercent = memory.usedPercent
                     self.memoryTotalBytes = memory.totalBytes
+                    if self.visiblePopovers.contains("RAM") {
+                        if let memorySwap {
+                            if memorySwap.available.boolValue {
+                                swapTotalBytes = memorySwap.totalBytes
+                                swapUsedBytes = memorySwap.usedBytes
+
+                            } else {
+                                swapTotalBytes = nil
+                                swapUsedBytes = nil
+                            }
+                        }
+                        if let pressure {
+                            self.memoryPressure = pressure
+                        }
+                    }
                     self.memoryHistory.append(memory.usedPercent, timestamp: timestamp)
                     self.gpuUtilization = gpu.utilization
                     self.gpuRenderUtilization = gpu.renderUtilization
@@ -331,7 +352,9 @@ final class SystemViewModel: @MainActor ObservableObject {
                     }
                     if self.isMonitoringTemperature, readTemperature { self.cpuTemperature = temperature }
                     self.menuBarMetrics.update(cpu: cpu.total, ram: memory.usedPercent, gpu: gpu.utilization)
-                    if !isMonitoringProcessesCPU && !isMonitoringProcessesRAM {
+                    if self.visiblePopovers.isEmpty
+                        && !self.isMonitoringProcessesCPU
+                        && !self.isMonitoringProcessesRAM {
                         processSampleRequested = false
                     } else {
                         if processSampleRequested {

@@ -1,10 +1,12 @@
 import AppKit
 import Combine
 import Foundation
+import ObjectiveC
 
 struct ObjCCPUUsage { var total: Float; var user: Float; var system: Float; var idle: Float }
 struct ObjCCPUStatsResult { var average: ObjCCPUUsage }
 struct ObjCMemoryUsage { var totalBytes: UInt64; var usedBytes: UInt64; var usedPercent: Float }
+struct ObjCSwapUsage {var totalBytes: UInt64; var usedBytes: UInt64; var available: ObjCBool}
 struct ObjCGPUUsage {
     var utilization: Float = 10
     var renderUtilization: Float = 5
@@ -14,6 +16,13 @@ struct ObjCGPUUsage {
     var vramTotal: UInt64 = 1000
 }
 
+enum ObjCMemoryPressure: Int {
+    case unknown = 0
+    case normal = 1
+    case warning = 2
+    case critical = 3
+}
+
 final class SystemMonitor {
     static let lock = NSLock()
     static var updates = 0
@@ -21,6 +30,32 @@ final class SystemMonitor {
     static var ramReads = 0
     static var resets = 0
     static var delay: useconds_t = 0
+
+    private static var swapResponse = ObjCSwapUsage(
+        totalBytes: 4096,
+        usedBytes: 1024,
+        available: ObjCBool(true)
+    )
+
+    static func setSwapResponse(
+        totalBytes: UInt64,
+        usedBytes: UInt64,
+        available: Bool
+    ) {
+        lock.lock()
+        defer { lock.unlock() }
+        swapResponse = ObjCSwapUsage(
+            totalBytes: totalBytes,
+            usedBytes: usedBytes,
+            available: ObjCBool(available)
+        )
+    }
+
+    func swapUsage() -> ObjCSwapUsage {
+        Self.lock.lock()
+        defer { Self.lock.unlock() }
+        return Self.swapResponse
+    }
 
     static func count(_ key: KeyPath<SystemMonitorCounters, Int>) -> Int {
         lock.lock(); defer { lock.unlock() }
@@ -46,6 +81,28 @@ final class SystemMonitor {
     }
     func resetProcessCPUHistory() {
         Self.lock.lock(); Self.resets += 1; Self.lock.unlock()
+    }
+
+    private static var mockMemoryPressure: ObjCMemoryPressure = .normal
+
+    static func setMemoryPressure(_ value: ObjCMemoryPressure) {
+
+        lock.lock()
+
+        defer { lock.unlock() }
+
+        mockMemoryPressure = value
+
+    }
+
+    func memoryPressure() -> ObjCMemoryPressure {
+
+        Self.lock.lock()
+
+        defer { Self.lock.unlock() }
+
+        return Self.mockMemoryPressure
+
     }
 }
 struct SystemMonitorCounters { let updates: Int; let cpuReads: Int; let ramReads: Int; let resets: Int }
@@ -169,6 +226,8 @@ struct MonitoringTests {
         testCPUMonitoring()
         testCPUPendingSampleCancellation()
         testMonitoringSleepWake()
+        testRAMDetailsWithoutProcesses()
+        testMemoryPressureTransitions()
 
         // History stays bounded and preserves real sample dates with mixed polling intervals.
         var history = HistoryData()
@@ -290,7 +349,15 @@ struct MonitoringTests {
 
         let vm = SystemViewModel(defaults: defaults)
 
+        assert(vm.swapTotalBytes == nil)
+        assert(vm.swapUsedBytes == nil)
         assert(vm.ramProcessState == .inactive)
+
+        SystemMonitor.setSwapResponse(
+            totalBytes: 4096,
+            usedBytes: 1024,
+            available: true
+        )
 
         vm.setPopoverVisible(true, module: "RAM")
         vm.isMonitoringProcessesRAM = true
@@ -307,10 +374,52 @@ struct MonitoringTests {
             }
         )
 
+        assert(vm.swapTotalBytes == 4096)
+        assert(vm.swapUsedBytes == 1024)
+
+        vm.setPopoverVisible(false, module: "RAM")
+
+        SystemMonitor.setSwapResponse(
+            totalBytes: 8192,
+            usedBytes: 2048,
+            available: false
+        )
+
+        vm.setPopoverVisible(true, module: "RAM")
+
+        waitUntil {
+            vm.swapTotalBytes == nil &&
+            vm.swapUsedBytes == nil
+        }
+
+        vm.setPopoverVisible(false, module: "RAM")
+
+        SystemMonitor.setSwapResponse(
+            totalBytes: 0,
+            usedBytes: 0,
+            available: true
+        )
+
+        vm.setPopoverVisible(true, module: "RAM")
+
+        waitUntil {
+            vm.swapTotalBytes == 0 &&
+            vm.swapUsedBytes == 0
+        }
+
+        assert(vm.swapTotalBytes != nil)
+        assert(vm.swapUsedBytes != nil)
+
         vm.setPopoverVisible(false, module: "RAM")
 
         assert(vm.ramProcessState == .inactive)
         assert(vm.topProcessesByRAM.isEmpty)
+
+        SystemMonitor.setSwapResponse(
+            totalBytes: 4096,
+            usedBytes: 1024,
+            available: true
+        )
 
         print("RAM monitoring checks passed")
     }
@@ -420,6 +529,9 @@ struct MonitoringTests {
         waitUntil {
             vm.ramProcessState == .ready
         }
+
+        assert(vm.swapTotalBytes == 4096)
+        assert(vm.swapUsedBytes == 1024)
 
         assert(vm.cpuProcessState == .loading)
 
@@ -550,5 +662,114 @@ struct MonitoringTests {
         assert(vm.topProcessesByCPU.isEmpty)
 
         print("Monitoring sleep/wake checks passed")
+    }
+
+    static func testRAMDetailsWithoutProcesses() {
+        SystemMonitor.lock.lock()
+        SystemMonitor.delay = 0
+        SystemMonitor.lock.unlock()
+
+        SystemMonitor.setSwapResponse(
+            totalBytes: 4096,
+            usedBytes: 1024,
+            available: true
+        )
+
+        let defaults = UserDefaults(
+            suiteName: "VitalsTests.RAMDetails.\(UUID())"
+        )!
+
+        defaults.setVolatileDomain(
+            [
+                "updateInterval": 60.0,
+                "backgroundUpdateInterval": 60.0,
+                "processUpdateInterval": 60.0,
+                "temperatureUpdateInterval": 60.0
+            ],
+            forName: UserDefaults.argumentDomain
+        )
+
+        let vm = SystemViewModel(defaults: defaults)
+
+        // Initial state.
+        assert(vm.memoryPressure == .unknown)
+        assert(vm.swapTotalBytes == nil)
+        assert(vm.swapUsedBytes == nil)
+        assert(vm.ramProcessState == .inactive)
+
+        // Open RAM without enabling process monitoring.
+        vm.setPopoverVisible(true, module: "RAM")
+
+        assert(vm.isMonitoringProcessesRAM == false)
+
+        // RAM details must load independently of process monitoring.
+        waitUntil {
+            vm.memoryPressure == .normal &&
+            vm.swapTotalBytes == 4096 &&
+            vm.swapUsedBytes == 1024
+        }
+
+        assert(vm.ramProcessState == .inactive)
+        assert(vm.topProcessesByRAM.isEmpty)
+
+        vm.setPopoverVisible(false, module: "RAM")
+
+        assert(vm.ramProcessState == .inactive)
+        assert(vm.topProcessesByRAM.isEmpty)
+
+        print("RAM details without processes checks passed")
+    }
+
+    static func testMemoryPressureTransitions() {
+        let defaults = UserDefaults(
+            suiteName: "VitalsTests.MemoryPressure.\(UUID())"
+        )!
+
+        defaults.setVolatileDomain(
+            [
+                "updateInterval": 60.0,
+                "backgroundUpdateInterval": 60.0,
+                "processUpdateInterval": 60.0,
+                "temperatureUpdateInterval": 60.0
+            ],
+            forName: UserDefaults.argumentDomain
+        )
+
+        SystemMonitor.lock.lock()
+        SystemMonitor.delay = 0
+        SystemMonitor.lock.unlock()
+
+        SystemMonitor.setMemoryPressure(.normal)
+
+        defer {
+            SystemMonitor.setMemoryPressure(.normal)
+        }
+
+        let vm = SystemViewModel(defaults: defaults)
+
+        assert(!vm.isMonitoringProcessesCPU)
+        assert(!vm.isMonitoringProcessesRAM)
+
+        let states: [ObjCMemoryPressure] = [
+            .normal,
+            .warning,
+            .critical,
+            .unknown,
+            .normal
+        ]
+
+        for state in states {
+            SystemMonitor.setMemoryPressure(state)
+
+            vm.setPopoverVisible(true, module: "RAM")
+
+            waitUntil {
+                vm.memoryPressure == state
+            }
+
+            vm.setPopoverVisible(false, module: "RAM")
+        }
+
+        print("Memory pressure transitions checks passed")
     }
 }

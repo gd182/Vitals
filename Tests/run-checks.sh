@@ -8,15 +8,22 @@ xcrun clang++ -std=gnu++20 -O2 -fobjc-arc -I Vitals/Core -I Vitals/Bridge \
     Tests/MemoryDetailsTests.mm Vitals/Bridge/SystemMonitor.mm \
     Vitals/Core/CPUStats.cpp Vitals/Core/MemoryStats.cpp \
     Vitals/Core/GPUStats.cpp Vitals/Core/ProcessStats.cpp \
+    Vitals/Core/ProcessNames.cpp \
     -framework Foundation -framework IOKit -framework CoreFoundation \
     -o "$check_dir/memory-details-tests"
 "$check_dir/memory-details-tests"
 
+xcrun clang++ -std=gnu++20 -O2 -Wall -Wextra -Werror -I Vitals/Core \
+    Tests/ProcessNamesTests.cpp Vitals/Core/ProcessNames.cpp \
+    -o "$check_dir/process-name-tests"
+"$check_dir/process-name-tests"
+
 xcrun clang++ -std=gnu++20 -O2 -I Vitals/Core Tests/CoreMetricsTests.cpp \
     Vitals/Core/CPUStats.cpp Vitals/Core/MemoryStats.cpp \
     Vitals/Core/GPUStats.cpp Vitals/Core/ProcessStats.cpp \
-    -framework IOKit -framework CoreFoundation -o "$check_dir/core-tests"
-"$check_dir/core-tests"
+    Vitals/Core/ProcessNames.cpp \
+    -framework IOKit -framework CoreFoundation -o "$check_dir/vitals-core-metrics-tests"
+"$check_dir/vitals-core-metrics-tests"
 
 xcrun swiftc -swift-version 5 -Onone -module-cache-path "$check_dir/swift-cache" \
     Tests/MonitoringTests.swift Vitals/Models/MonitoringPreferences.swift \
@@ -79,7 +86,7 @@ if [[ "${1:-}" == "--ui" ]]; then
     done < <(find Vitals -type f -name '*.swift' ! -name 'VitalsApp.swift')
     object_dir="$check_dir/build/Build/Intermediates.noindex/Vitals.build/Release/Vitals.build/Objects-normal/$machine_arch"
     native_objects=()
-    for name in SystemMonitor CPUStats MemoryStats GPUStats ProcessStats; do
+    for name in SystemMonitor CPUStats MemoryStats GPUStats ProcessStats ProcessNames; do
         native_objects+=("$object_dir/$name.o")
     done
     xcrun swiftc -swift-version 5 -Onone -target "$machine_arch-apple-macos14.6" \

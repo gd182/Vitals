@@ -2,6 +2,7 @@
 #include "MemoryStats.hpp"
 #include "GPUStats.hpp"
 #include "ProcessStats.hpp"
+#include "ProcessNames.hpp"
 
 #include <atomic>
 #include <cassert>
@@ -12,6 +13,8 @@
 #include <thread>
 #include <unistd.h>
 #include <mach/mach.h>
+#include <libproc.h>
+#include <sys/resource.h>
 
 static double toSeconds(const timespec& ts)
 {
@@ -88,6 +91,13 @@ int main(int argc, char**) {
 
     assert(std::isfinite(ram.usedPercent));
 
+    rusage_info_v2 ownUsage{};
+    assert(proc_pid_rusage(
+        getpid(), RUSAGE_INFO_V2,
+        reinterpret_cast<rusage_info_t*>(&ownUsage)
+    ) == 0);
+    assert(ownUsage.ri_proc_start_abstime > 0);
+
     Vitals::ProcessStats processes;
 
     assert(processes.getProcCPUInfo(false, 0).empty());
@@ -144,6 +154,8 @@ int main(int argc, char**) {
         assert(process.value >= 0);
 
         if (process.pid == getpid()) {
+            assert(process.name == "vitals-core-metrics-tests");
+            assert(process.startTime == ownUsage.ri_proc_start_abstime);
             found = true;
 
             std::cout
@@ -162,5 +174,30 @@ int main(int argc, char**) {
     assert(ramTop.size() <= 10);
     for (size_t i = 1; i < ramTop.size(); ++i)
         assert(ramTop[i - 1].value >= ramTop[i].value);
+
+    const auto ramTopLong = processes.getProcRAMInfo(false, 10000);
+    bool foundRAM = false;
+    for (const auto& process : ramTopLong) {
+        if (process.pid == getpid()) {
+            assert(process.name == "vitals-core-metrics-tests");
+            assert(process.startTime == ownUsage.ri_proc_start_abstime);
+            foundRAM = true;
+        }
+    }
+    assert(foundRAM);
+
+    assert(Vitals::Detail::resolveProcessName(-1, "fallback-name", 1) == "fallback-name");
+    assert(Vitals::Detail::resolveProcessName(-1, "", 1).empty());
+    assert(Vitals::Detail::resolveProcessName(
+        getpid(), "fallback-name", ownUsage.ri_proc_start_abstime
+    ) == "vitals-core-metrics-tests");
+    assert(Vitals::Detail::resolveProcessName(
+        getpid(), "fallback-name", 0
+    ) == "fallback-name");
+    const uint64_t differentStartTime = ownUsage.ri_proc_start_abstime == 1 ? 2 : 1;
+    assert(Vitals::Detail::resolveProcessName(
+        getpid(), "fallback-name", differentStartTime
+    ) == "fallback-name");
+
     std::cout << "Core metrics checks passed\n";
 }

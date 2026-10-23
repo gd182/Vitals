@@ -9,11 +9,6 @@ import SwiftUI
 
 
 struct RAMIndicatorsView: View {
-    enum RAMIndicatorStyle: String {
-        case ring
-        case value
-    }
-
     @AppStorage("ramIndicatorStyle")
         private var ramIndicatorStyle: RAMIndicatorStyle = .ring
     @EnvironmentObject var vm: SystemViewModel

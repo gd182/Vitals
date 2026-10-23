@@ -4,6 +4,14 @@ set -eu
 cd "$(dirname "$0")/.."
 check_dir=$(mktemp -d "${TMPDIR:-/tmp}/vitals-checks.XXXXXX")
 
+xcrun clang++ -std=gnu++20 -O2 -fobjc-arc -I Vitals/Core -I Vitals/Bridge \
+    Tests/MemoryDetailsTests.mm Vitals/Bridge/SystemMonitor.mm \
+    Vitals/Core/CPUStats.cpp Vitals/Core/MemoryStats.cpp \
+    Vitals/Core/GPUStats.cpp Vitals/Core/ProcessStats.cpp \
+    -framework Foundation -framework IOKit -framework CoreFoundation \
+    -o "$check_dir/memory-details-tests"
+"$check_dir/memory-details-tests"
+
 xcrun clang++ -std=gnu++20 -O2 -I Vitals/Core Tests/CoreMetricsTests.cpp \
     Vitals/Core/CPUStats.cpp Vitals/Core/MemoryStats.cpp \
     Vitals/Core/GPUStats.cpp Vitals/Core/ProcessStats.cpp \
@@ -33,6 +41,7 @@ xcrun swiftc -swift-version 5 -Onone -module-cache-path "$check_dir/swift-cache"
 
 xcrun swiftc -swift-version 5 -Onone -module-cache-path "$check_dir/swift-cache" \
     Tests/SettingsPreferencesTests.swift Vitals/Models/MenuBarPreferences.swift Vitals/Models/DashboardConfig.swift \
+    Vitals/Models/RAMIndicatorStyle.swift \
     -o "$check_dir/settings-tests"
 "$check_dir/settings-tests"
 

@@ -10,7 +10,7 @@ struct AppearanceSettingsView: View {
     @AppStorage("ramShowSwap") private var showSwap = true
     @AppStorage("ramShowMemoryPressure") private var showMemoryPressure = true
     @AppStorage("ramIndicatorStyle")
-        private var ramIndicatorStyle: RAMIndicatorsView.RAMIndicatorStyle = .ring
+        private var ramIndicatorStyle: RAMIndicatorStyle = .ring
 
     private var palette = UsagePalette()
 
@@ -50,9 +50,9 @@ struct AppearanceSettingsView: View {
                 Section("RAM") {
                     Picker("ram_indicator_style", selection: $ramIndicatorStyle) {
                         Text("ram_indicator_ring")
-                            .tag(RAMIndicatorsView.RAMIndicatorStyle.ring)
+                            .tag(RAMIndicatorStyle.ring)
                         Text("ram_indicator_value")
-                            .tag(RAMIndicatorsView.RAMIndicatorStyle.value)
+                            .tag(RAMIndicatorStyle.value)
                     }
                     Toggle("memory_swap_used", isOn: $showSwap)
                     Toggle("memory_pressure", isOn: $showMemoryPressure)

@@ -2,6 +2,7 @@ import AppKit
 import Combine
 import Foundation
 import ObjectiveC
+import Dispatch
 
 struct ObjCCPUUsage { var total: Float; var user: Float; var system: Float; var idle: Float }
 struct ObjCCPUStatsResult { var average: ObjCCPUUsage }
@@ -90,6 +91,16 @@ final class SystemMonitor {
     }
 
     private static var mockMemoryPressure: ObjCMemoryPressure = .normal
+    private static var pressureReadGates: [DispatchSemaphore] = []
+
+    static func blockPressureReads(_ count: Int) -> [DispatchSemaphore] {
+        lock.lock()
+        defer { lock.unlock() }
+        assert(pressureReadGates.isEmpty)
+        let gates = (0..<count).map { _ in DispatchSemaphore(value: 0) }
+        pressureReadGates = gates
+        return gates
+    }
 
     static func setMemoryPressure(_ value: ObjCMemoryPressure) {
 
@@ -102,14 +113,13 @@ final class SystemMonitor {
     }
 
     func memoryPressure() -> ObjCMemoryPressure {
-
         Self.lock.lock()
-
-        defer { Self.lock.unlock() }
-
         Self.pressureReads += 1
-        return Self.mockMemoryPressure
-
+        let value = Self.mockMemoryPressure
+        let gate = Self.pressureReadGates.isEmpty ? nil : Self.pressureReadGates.removeFirst()
+        Self.lock.unlock()
+        if let gate { assert(gate.wait(timeout: .now() + 5) == .success) }
+        return value
     }
 }
 struct SystemMonitorCounters {
@@ -245,6 +255,10 @@ struct MonitoringTests {
         testMemoryPressureTransitions()
         testRAMDetailSamplingVisibility()
         testRAMDetailsNotReadForCPU()
+        testRAMDetailPreferenceRefresh()
+        testRAMDetailsIgnoreClosedPreferenceChanges()
+        testRAMDetailsRejectStaleResults()
+        testRAMDetailsDisableInFlight()
 
         // History stays bounded and preserves real sample dates with mixed polling intervals.
         var history = HistoryData()
@@ -326,6 +340,158 @@ struct MonitoringTests {
         assert(vm.swapUsedBytes == nil && vm.memoryPressure == .unknown)
         vm.setPopoverVisible(false, module: "CPU")
         print("Hidden RAM details stay unsampled during CPU monitoring checks passed")
+    }
+
+    static func ramDetailDefaults(_ name: String) -> UserDefaults {
+        let defaults = UserDefaults(suiteName: "VitalsTests.\(name).\(UUID())")!
+        defaults.setVolatileDomain([
+            "updateInterval": 60.0,
+            "backgroundUpdateInterval": 60.0,
+            "processUpdateInterval": 60.0,
+            "temperatureUpdateInterval": 60.0
+        ], forName: UserDefaults.argumentDomain)
+        return defaults
+    }
+
+    static func applyRAMDetailSettings(_ changes: [String: Bool], defaults: UserDefaults) {
+        var values = defaults.volatileDomain(forName: UserDefaults.argumentDomain)
+        for (key, value) in changes { values[key] = value }
+        defaults.setVolatileDomain(values, forName: UserDefaults.argumentDomain)
+        NotificationCenter.default.post(name: UserDefaults.didChangeNotification, object: defaults)
+    }
+
+    static func testRAMDetailPreferenceRefresh() {
+        let defaults = ramDetailDefaults("RAMDetailRefresh")
+        applyRAMDetailSettings(["ramShowSwap": false, "ramShowMemoryPressure": false], defaults: defaults)
+        SystemMonitor.setSwapResponse(totalBytes: 4096, usedBytes: 1024, available: true)
+        SystemMonitor.setMemoryPressure(.normal)
+        let vm = SystemViewModel(defaults: defaults)
+        waitUntil { vm.memoryTotalBytes == 1000 }
+        var samples = 0
+        let subscription = vm.objectWillChange.sink { samples += 1 }
+        defer { subscription.cancel() }
+        vm.setPopoverVisible(true, module: "RAM")
+        waitUntil { samples > 0 }
+        let swapBefore = SystemMonitor.count(\.swapReads)
+        let pressureBefore = SystemMonitor.count(\.pressureReads)
+
+        applyRAMDetailSettings(["ramShowSwap": true], defaults: defaults)
+        waitUntil { vm.swapUsedBytes == 1024 }
+        assert(SystemMonitor.count(\.swapReads) == swapBefore + 1)
+        assert(SystemMonitor.count(\.pressureReads) == pressureBefore)
+
+        applyRAMDetailSettings(["ramShowSwap": false], defaults: defaults)
+        assert(vm.swapUsedBytes == nil && vm.swapTotalBytes == nil)
+        applyRAMDetailSettings(["ramShowMemoryPressure": true], defaults: defaults)
+        waitUntil { vm.memoryPressure == .normal }
+        assert(SystemMonitor.count(\.swapReads) == swapBefore + 1)
+        assert(SystemMonitor.count(\.pressureReads) == pressureBefore + 1)
+
+        applyRAMDetailSettings(["RAM.ram_details.visible": false], defaults: defaults)
+        assert(vm.memoryPressure == .unknown)
+        applyRAMDetailSettings(["ramShowSwap": true], defaults: defaults)
+        pump(0.1)
+        assert(SystemMonitor.count(\.swapReads) == swapBefore + 1)
+        assert(SystemMonitor.count(\.pressureReads) == pressureBefore + 1)
+
+        applyRAMDetailSettings(["RAM.ram_details.visible": true], defaults: defaults)
+        waitUntil { vm.swapUsedBytes == 1024 && vm.memoryPressure == .normal }
+        assert(SystemMonitor.count(\.swapReads) == swapBefore + 2)
+        assert(SystemMonitor.count(\.pressureReads) == pressureBefore + 2)
+        NotificationCenter.default.post(name: UserDefaults.didChangeNotification, object: defaults)
+        pump(0.1)
+        assert(SystemMonitor.count(\.swapReads) == swapBefore + 2)
+        assert(SystemMonitor.count(\.pressureReads) == pressureBefore + 2)
+        vm.setPopoverVisible(false, module: "RAM")
+        assert(vm.swapUsedBytes == nil && vm.memoryPressure == .unknown)
+        print("RAM detail toggles refresh immediately at 60-second intervals checks passed")
+    }
+
+    static func testRAMDetailsIgnoreClosedPreferenceChanges() {
+        let defaults = ramDetailDefaults("RAMDetailsClosedChanges")
+        let vm = SystemViewModel(defaults: defaults)
+        waitUntil { vm.memoryTotalBytes == 1000 }
+        let before = SystemMonitor.count(\.updates)
+        applyRAMDetailSettings(["ramShowSwap": false, "ramShowMemoryPressure": false], defaults: defaults)
+        applyRAMDetailSettings(["ramShowSwap": true, "ramShowMemoryPressure": true], defaults: defaults)
+        pump(0.1)
+        assert(SystemMonitor.count(\.updates) == before)
+        assert(vm.swapUsedBytes == nil && vm.memoryPressure == .unknown)
+        print("Closed RAM preference changes do not schedule extra samples checks passed")
+    }
+
+    static func testRAMDetailsRejectStaleResults() {
+        for scenario in ["swap", "pressure", "block", "reopen", "wake"] {
+            let defaults = ramDetailDefaults("RAMDetailsStale.\(scenario)")
+            SystemMonitor.setSwapResponse(totalBytes: 8192, usedBytes: 1000, available: true)
+            SystemMonitor.setMemoryPressure(.warning)
+            defer {
+                SystemMonitor.setSwapResponse(totalBytes: 4096, usedBytes: 1024, available: true)
+                SystemMonitor.setMemoryPressure(.normal)
+            }
+            let vm = SystemViewModel(defaults: defaults)
+            waitUntil { vm.memoryTotalBytes == 1000 }
+            let pressureBefore = SystemMonitor.count(\.pressureReads)
+            let updatesBefore = SystemMonitor.count(\.updates)
+            let gates = SystemMonitor.blockPressureReads(2)
+            defer { gates.forEach { $0.signal() } }
+
+            vm.setPopoverVisible(true, module: "RAM")
+            waitUntil { SystemMonitor.count(\.pressureReads) == pressureBefore + 1 }
+            SystemMonitor.setSwapResponse(totalBytes: 8192, usedBytes: 2000, available: true)
+            SystemMonitor.setMemoryPressure(.critical)
+            switch scenario {
+            case "swap", "pressure", "block":
+                let key = scenario == "swap" ? "ramShowSwap" :
+                    (scenario == "pressure" ? "ramShowMemoryPressure" : "RAM.ram_details.visible")
+                applyRAMDetailSettings([key: false], defaults: defaults)
+                applyRAMDetailSettings([key: true], defaults: defaults)
+            case "reopen":
+                vm.setPopoverVisible(false, module: "RAM")
+                vm.setPopoverVisible(true, module: "RAM")
+            default:
+                NSWorkspace.shared.notificationCenter.post(name: NSWorkspace.willSleepNotification, object: nil)
+                NSWorkspace.shared.notificationCenter.post(name: NSWorkspace.didWakeNotification, object: nil)
+            }
+
+            gates[0].signal()
+            waitUntil { SystemMonitor.count(\.pressureReads) == pressureBefore + 2 }
+            // The old callback has completed, but the fresh result is still blocked.
+            assert(vm.swapUsedBytes == nil && vm.memoryPressure == .unknown)
+            gates[1].signal()
+            waitUntil { vm.swapUsedBytes == 2000 && vm.memoryPressure == .critical }
+            assert(SystemMonitor.count(\.updates) == updatesBefore + 2)
+            assert(SystemMonitor.count(\.pressureReads) == pressureBefore + 2)
+            vm.setPopoverVisible(false, module: "RAM")
+        }
+        print("RAM detail stale-result rejection and coalescing checks passed")
+    }
+
+    static func testRAMDetailsDisableInFlight() {
+        let defaults = ramDetailDefaults("RAMDetailsDisableInFlight")
+        let vm = SystemViewModel(defaults: defaults)
+        waitUntil { vm.memoryTotalBytes == 1000 }
+        let pressureBefore = SystemMonitor.count(\.pressureReads)
+        let swapBefore = SystemMonitor.count(\.swapReads)
+        let gate = SystemMonitor.blockPressureReads(1)[0]
+        defer { gate.signal() }
+        var samples = 0
+        let subscription = vm.objectWillChange.sink { samples += 1 }
+        defer { subscription.cancel() }
+        vm.setPopoverVisible(true, module: "RAM")
+        waitUntil { SystemMonitor.count(\.pressureReads) == pressureBefore + 1 }
+        applyRAMDetailSettings(["ramShowSwap": false, "ramShowMemoryPressure": false], defaults: defaults)
+        let beforeCompletion = samples
+        gate.signal()
+        waitUntil { samples > beforeCompletion }
+        assert(vm.swapUsedBytes == nil && vm.memoryPressure == .unknown)
+        let beforeNextSample = samples
+        vm.setPopoverVisible(true, module: "RAM")
+        waitUntil { samples > beforeNextSample }
+        assert(SystemMonitor.count(\.swapReads) == swapBefore + 1)
+        assert(SystemMonitor.count(\.pressureReads) == pressureBefore + 1)
+        vm.setPopoverVisible(false, module: "RAM")
+        print("RAM detail disabling rejects an in-flight result and stops new reads checks passed")
     }
 
     static func testRAMDetailPreferences() {
@@ -506,9 +672,11 @@ struct MonitoringTests {
             available: false
         )
 
+        let unavailableSwapReads = SystemMonitor.count(\.swapReads)
         vm.setPopoverVisible(true, module: "RAM")
 
         waitUntil {
+            SystemMonitor.count(\.swapReads) > unavailableSwapReads &&
             vm.swapTotalBytes == nil &&
             vm.swapUsedBytes == nil
         }
@@ -879,13 +1047,18 @@ struct MonitoringTests {
             .normal
         ]
 
+        var changes = 0
+        let subscription = vm.objectWillChange.sink { changes += 1 }
+        defer { subscription.cancel() }
+
         for state in states {
             SystemMonitor.setMemoryPressure(state)
+            let beforeOpening = changes
 
             vm.setPopoverVisible(true, module: "RAM")
 
             waitUntil {
-                vm.memoryPressure == state
+                changes > beforeOpening && vm.memoryPressure == state
             }
 
             vm.setPopoverVisible(false, module: "RAM")

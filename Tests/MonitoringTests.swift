@@ -133,6 +133,7 @@ struct MonitoringTests {
 
     static func main() {
         testMenuBarMetrics()
+        testRAMDetailPreferences()
 
         let defaults = UserDefaults(suiteName: "VitalsTests.\(UUID())")!
         var values: [String: Any] = ["updateInterval": 0.5, "backgroundUpdateInterval": 2,
@@ -240,6 +241,41 @@ struct MonitoringTests {
         assert(points.last?.timestamp == Date(timeIntervalSince1970: 999 * 3))
 
         print("Monitoring, lifecycle, preferences and history checks passed")
+    }
+
+    static func testRAMDetailPreferences() {
+        let suite = "VitalsTests.RAMDetailPreferences.\(UUID())"
+        let defaults = UserDefaults(suiteName: suite)!
+        defer { defaults.removePersistentDomain(forName: suite) }
+
+        let original = MonitoringPreferences(defaults: defaults)
+        assert(original.ramShowSwap)
+        assert(original.ramShowMemoryPressure)
+        assert(original.ramDetailsVisible)
+
+        for mask in 0..<8 {
+            defaults.setVolatileDomain([
+                "ramShowSwap": mask & 1 != 0,
+                "ramShowMemoryPressure": mask & 2 != 0,
+                "RAM.ram_details.visible": mask & 4 != 0
+            ], forName: UserDefaults.argumentDomain)
+            let preferences = MonitoringPreferences(defaults: defaults)
+            assert(preferences.ramShowSwap == (mask & 1 != 0))
+            assert(preferences.ramShowMemoryPressure == (mask & 2 != 0))
+            assert(preferences.ramDetailsVisible == (mask & 4 != 0))
+        }
+
+        let keys = ["ramShowSwap", "ramShowMemoryPressure", "RAM.ram_details.visible"]
+        for key in keys {
+            defaults.setVolatileDomain([key: false], forName: UserDefaults.argumentDomain)
+            assert(MonitoringPreferences(defaults: defaults) != original)
+        }
+        defaults.setVolatileDomain(
+            Dictionary(uniqueKeysWithValues: keys.map { ($0, "invalid") }),
+            forName: UserDefaults.argumentDomain
+        )
+        assert(MonitoringPreferences(defaults: defaults) == original)
+        print("RAM detail preference defaults, combinations and change detection checks passed")
     }
 
     static func testMenuBarMetrics() {

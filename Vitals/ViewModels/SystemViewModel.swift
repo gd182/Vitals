@@ -160,7 +160,18 @@ final class SystemViewModel: @MainActor ObservableObject {
     private var lastTemperatureRead: TimeInterval?
     private var cpuProcessGeneration = 0
     private var ramProcessGeneration = 0
+    private var ramDetailsGeneration = 0
     private var sampledCPUProcessGeneration = -1
+
+    private func invalidateRAMDetails() {
+        ramDetailsGeneration += 1
+        if swapTotalBytes != nil || swapUsedBytes != nil || memoryPressure != .unknown {
+            objectWillChange.send()
+        }
+        swapTotalBytes = nil
+        swapUsedBytes = nil
+        memoryPressure = .unknown
+    }
 
     init(defaults: UserDefaults = .standard) {
         self.defaults = defaults
@@ -174,10 +185,25 @@ final class SystemViewModel: @MainActor ObservableObject {
                 guard let self else { return }
                 let next = MonitoringPreferences(defaults: self.defaults)
                 guard next != self.preferences else { return }
+                let blockChanged = next.ramDetailsVisible != self.preferences.ramDetailsVisible
+                let swapChanged = blockChanged || next.ramShowSwap != self.preferences.ramShowSwap
+                let pressureChanged = blockChanged || next.ramShowMemoryPressure != self.preferences.ramShowMemoryPressure
                 self.objectWillChange.send()
                 self.preferences = next
+                if swapChanged || pressureChanged {
+                    self.ramDetailsGeneration += 1
+                    if swapChanged {
+                        self.swapTotalBytes = nil
+                        self.swapUsedBytes = nil
+                    }
+                    if pressureChanged { self.memoryPressure = .unknown }
+                }
                 self.applyPreferences()
                 self.startTimer()
+                if (swapChanged || pressureChanged), self.visiblePopovers.contains("RAM"),
+                   next.ramDetailsVisible, next.ramShowSwap || next.ramShowMemoryPressure {
+                    self.requestProcessSample()
+                }
             }
         }
         let workspace = NSWorkspace.shared.notificationCenter
@@ -186,6 +212,7 @@ final class SystemViewModel: @MainActor ObservableObject {
         ) { [weak self] _ in
             MainActor.assumeIsolated {
                 self?.isSleeping = true
+                self?.invalidateRAMDetails()
                 self?.timer?.invalidate()
                 self?.resetWarmupTimer()
                 self?.timer = nil
@@ -209,7 +236,7 @@ final class SystemViewModel: @MainActor ObservableObject {
                     self.cpuProcessState = .loading
                 }
                 self.startTimer()
-                self.sample()
+                self.requestProcessSample()
             }
         })
         startTimer()
@@ -224,7 +251,9 @@ final class SystemViewModel: @MainActor ObservableObject {
     }
 
     func setPopoverVisible(_ visible: Bool, module: String) {
+        let wasVisible = visiblePopovers.contains(module)
         if visible { visiblePopovers.insert(module) } else { visiblePopovers.remove(module) }
+        if module == "RAM", wasVisible != visible { invalidateRAMDetails() }
         if !visible {
             switch module {
             case "CPU":
@@ -275,7 +304,10 @@ final class SystemViewModel: @MainActor ObservableObject {
             : preferences.processInterval
         let readCPU = isMonitoringProcessesCPU && isDue(lastCPUProcessRead, interval: cpuProcessInterval)
         let readRAM = isMonitoringProcessesRAM && isDue(lastRAMProcessRead, interval: preferences.processInterval)
-        let readRAMDetails = visiblePopovers.contains("RAM")
+        let readRAMDetails = visiblePopovers.contains("RAM") && preferences.ramDetailsVisible
+        let readSwap = readRAMDetails && preferences.ramShowSwap
+        let readPressure = readRAMDetails && preferences.ramShowMemoryPressure
+        let ramDetailsGeneration = self.ramDetailsGeneration
         let readTemperature = isMonitoringTemperature && isDue(lastTemperatureRead, interval: preferences.temperatureInterval)
         let cpuGeneration = cpuProcessGeneration, ramGeneration = ramProcessGeneration
         let resetCPU = readCPU && sampledCPUProcessGeneration != cpuGeneration
@@ -290,8 +322,8 @@ final class SystemViewModel: @MainActor ObservableObject {
                 monitor.update()
                 let cpu = monitor.cpuStats().average
                 let memory = monitor.memoryUsage()
-                let memorySwap: ObjCSwapUsage? = readRAMDetails ? monitor.swapUsage() : nil
-                let pressure: ObjCMemoryPressure? = readRAMDetails ? monitor.memoryPressure() : nil
+                let memorySwap: ObjCSwapUsage? = readSwap ? monitor.swapUsage() : nil
+                let pressure: ObjCMemoryPressure? = readPressure ? monitor.memoryPressure() : nil
                 let gpu = monitor.gpuUsage()
                 if resetCPU { monitor.resetProcessCPUHistory() }
                 let processesCPU = readCPU ? ProcessUsage.decode(monitor.topProcessesByCPU() as NSArray) : nil
@@ -311,8 +343,10 @@ final class SystemViewModel: @MainActor ObservableObject {
                     self.memoryUsedBytes = memory.usedBytes
                     self.memoryPercent = memory.usedPercent
                     self.memoryTotalBytes = memory.totalBytes
-                    if self.visiblePopovers.contains("RAM") {
-                        if let memorySwap {
+                    // Visibility may have changed away and back while the worker was reading.
+                    if ramDetailsGeneration == self.ramDetailsGeneration,
+                       self.visiblePopovers.contains("RAM"), self.preferences.ramDetailsVisible {
+                        if self.preferences.ramShowSwap, let memorySwap {
                             if memorySwap.available.boolValue {
                                 swapTotalBytes = memorySwap.totalBytes
                                 swapUsedBytes = memorySwap.usedBytes
@@ -322,7 +356,7 @@ final class SystemViewModel: @MainActor ObservableObject {
                                 swapUsedBytes = nil
                             }
                         }
-                        if let pressure {
+                        if self.preferences.ramShowMemoryPressure, let pressure {
                             self.memoryPressure = pressure
                         }
                     }

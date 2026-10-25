@@ -8,6 +8,9 @@ nonisolated struct MonitoringPreferences: Equatable {
     var temperatureInterval: TimeInterval
     var warningThreshold: Float
     var criticalThreshold: Float
+    var ramShowSwap: Bool
+    var ramShowMemoryPressure: Bool
+    var ramDetailsVisible: Bool
 
     init(defaults: UserDefaults = .standard) {
         func interval(_ key: String, fallback: Double) -> Double {
@@ -15,6 +18,9 @@ nonisolated struct MonitoringPreferences: Equatable {
                   number.doubleValue.isFinite, number.doubleValue > 0 else { return fallback }
             return min(60, max(0.5, number.doubleValue))
         }
+        ramShowSwap = defaults.object(forKey: "ramShowSwap") as? Bool ?? true
+        ramShowMemoryPressure = defaults.object(forKey: "ramShowMemoryPressure") as? Bool ?? true
+        ramDetailsVisible = defaults.object(forKey: "RAM.ram_details.visible") as? Bool ?? true
         foregroundInterval = interval("updateInterval", fallback: 1)
         // Keep the existing user's cadence until they select a separate background interval.
         backgroundInterval = interval("backgroundUpdateInterval", fallback:

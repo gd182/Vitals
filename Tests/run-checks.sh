@@ -4,6 +4,11 @@ set -eu
 cd "$(dirname "$0")/.."
 check_dir=$(mktemp -d "${TMPDIR:-/tmp}/vitals-checks.XXXXXX")
 
+xcrun swiftc -swift-version 5 -Onone -module-cache-path "$check_dir/swift-cache" \
+    Tests/AppBuildInfoTests.swift Vitals/Models/AppBuildInfo.swift \
+    -o "$check_dir/app-build-info-tests"
+"$check_dir/app-build-info-tests"
+
 xcrun clang++ -std=gnu++20 -O2 -fobjc-arc -I Vitals/Core -I Vitals/Bridge \
     Tests/MemoryDetailsTests.mm Vitals/Bridge/SystemMonitor.mm \
     Vitals/Core/CPUStats.cpp Vitals/Core/MemoryStats.cpp \

@@ -24,6 +24,7 @@ struct SettingsView: View {
 
     @State private var selection: Section = .general
     private let appearanceTab: Int
+    private let appBuildInfo = AppBuildInfo()
 
     init(initialSection: Section = .general, appearanceTab: Int = 0) {
         _selection = State(initialValue: initialSection)
@@ -53,6 +54,33 @@ struct SettingsView: View {
                 }
                 .padding(.horizontal, 10)
                 Spacer()
+                HStack(spacing: 8) {
+                    if let version = appBuildInfo.version {
+                        Text(verbatim: "v\(version)")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                            .lineLimit(1)
+                            .truncationMode(.middle)
+                            .help(version)
+                            .accessibilityLabel(Text("settings_app_version") + Text(verbatim: " \(version)"))
+                    }
+                    Spacer(minLength: 0)
+                    Button {
+                        NSApplication.shared.terminate(nil)
+                    } label: {
+                        Label("settings_quit", systemImage: "power")
+                            .labelStyle(.iconOnly)
+                            .frame(width: 32, height: 32)
+                            .contentShape(Rectangle())
+                    }
+                    .buttonStyle(.plain)
+                    .foregroundStyle(.secondary)
+                    .help("settings_quit")
+                    .keyboardShortcut("q", modifiers: .command)
+                }
+                .padding(.leading, 20)
+                .padding(.trailing, 12)
+                .padding(.bottom, 12)
             }
             .padding(.top, 24)
             .frame(width: 190)

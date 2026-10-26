@@ -547,6 +547,70 @@
         }
       }
     },
+    "metric_explanation" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "de" : { "stringUnit" : { "state" : "translated", "value" : "Erklärung" } },
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Explanation" } },
+        "ru" : { "stringUnit" : { "state" : "translated", "value" : "Пояснение" } }
+      }
+    },
+    "metric_explanation_close" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "de" : { "stringUnit" : { "state" : "translated", "value" : "Erklärung schließen" } },
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Close explanation" } },
+        "ru" : { "stringUnit" : { "state" : "translated", "value" : "Закрыть пояснение" } }
+      }
+    },
+    "gpu_utilization_help" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "de" : { "stringUnit" : { "state" : "translated", "value" : "Auslastung des Grafikprozessors bei Grafikaufgaben und Berechnungen." } },
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Graphics processor activity during graphics work and computing." } },
+        "ru" : { "stringUnit" : { "state" : "translated", "value" : "Занятость графического процессора при работе с графикой и выполнении вычислений." } }
+      }
+    },
+    "gpu_renderer_help" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "de" : { "stringUnit" : { "state" : "translated", "value" : "Auslastung des GPU-Bereichs, der das Bild zeichnet." } },
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Activity of the part of the GPU that draws the image." } },
+        "ru" : { "stringUnit" : { "state" : "translated", "value" : "Занятость части GPU, которая отрисовывает изображение." } }
+      }
+    },
+    "gpu_tiler_help" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "de" : { "stringUnit" : { "state" : "translated", "value" : "Auslastung des GPU-Bereichs, der die Geometrie einer Szene zum Zeichnen vorbereitet." } },
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Activity of the part of the GPU that prepares scene geometry for drawing." } },
+        "ru" : { "stringUnit" : { "state" : "translated", "value" : "Занятость части GPU, которая подготавливает объекты сцены к отрисовке." } }
+      }
+    },
+    "gpu_neural_engine_help" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "de" : { "stringUnit" : { "state" : "translated", "value" : "Auslastung der Apple Neural Engine, eines Beschleunigers für maschinelles Lernen." } },
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Activity of the Apple Neural Engine, an accelerator for machine-learning tasks." } },
+        "ru" : { "stringUnit" : { "state" : "translated", "value" : "Занятость Apple Neural Engine — ускорителя задач машинного обучения." } }
+      }
+    },
+    "gpu_memory_title" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "de" : { "stringUnit" : { "state" : "translated", "value" : "GPU-Speicher" } },
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "GPU memory" } },
+        "ru" : { "stringUnit" : { "state" : "translated", "value" : "Память GPU" } }
+      }
+    },
+    "gpu_memory_help" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "de" : { "stringUnit" : { "state" : "translated", "value" : "Speicher für Grafikdaten. Auf Macs mit Apple silicon zeigt „Gesamt“ den RAM des Computers, den CPU und GPU gemeinsam nutzen." } },
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Memory for graphics data. On Macs with Apple silicon, Total shows the computer's RAM shared by the CPU and GPU." } },
+        "ru" : { "stringUnit" : { "state" : "translated", "value" : "Память для графических данных. На Mac с Apple silicon «Всего» показывает общую RAM компьютера, которой пользуются CPU и GPU." } }
+      }
+    },
     "memory_free" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -622,19 +686,19 @@
         "de" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Zeigt, wie gut das System den Speicherbedarf decken kann. Dies ist ein macOS-Speicherdruckstatus, nicht der Prozentsatz des belegten Arbeitsspeichers"
+            "value" : "Zeigt, ob dem System genügend RAM zur Verfügung steht. Normal: Der Bedarf wird gedeckt. Erhöht: Die Speicherressourcen werden knapp. Kritisch: Speichermangel kann das System verlangsamen."
           }
         },
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Indicates how well the system can meet memory demands. This is a macOS memory-pressure state, not the percentage of RAM in use"
+            "value" : "Indicates whether the system has enough RAM. Normal: memory demands are being met. Elevated: memory resources are getting tight. Critical: memory shortages may slow the system down."
           }
         },
         "ru" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Показывает, насколько системе хватает оперативной памяти. Это состояние macOS, а не процент занятой RAM"
+            "value" : "Показывает, хватает ли системе RAM. Нормальная: потребности в памяти обеспечены. Повышенная: ресурсов памяти становится мало. Критическая: нехватка памяти может замедлять систему."
           }
         }
       }
@@ -691,19 +755,19 @@
         "de" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Daten, die vorübergehend aus dem Arbeitsspeicher auf die Festplatte ausgelagert wurden. Die Nutzung von Swap allein bedeutet keinen Speichermangel"
+            "value" : "Belegter Speicherplatz auf dem Datenträger, den macOS als Ergänzung zum RAM nutzt."
           }
         },
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Data temporarily moved from RAM to disk. Swap usage alone does not indicate a memory shortage"
+            "value" : "Disk space currently used by macOS to supplement RAM."
           }
         },
         "ru" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Данные, временно перенесённые из оперативной памяти на диск. Использование swap само по себе не означает нехватку памяти"
+            "value" : "Занятое место на диске, которое macOS использует в дополнение к оперативной памяти."
           }
         }
       }

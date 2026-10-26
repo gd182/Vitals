@@ -16,10 +16,10 @@ struct GPUView: View {
     let blocks: [DashboardBlock] = [
         DashboardBlock(id: "gpu_indicators", title: "block_indicators", content: .gpuIndicators, hasSettings: false),
         DashboardBlock(id: "gpu_details", title: "block_details_gpu", content: .gpuDetails, hasSettings: false),
-        DashboardBlock(id: "gpu_chart_utl", title: "block_chart_gpu_util", content: .gpuChartUtl(namespace: "chart_GPU_utl"), hasSettings: true),
-        DashboardBlock(id: "gpu_chart_render", title: "block_chart_gpu_render", content: .gpuChartRender(namespace: "chart_GPU_render"), hasSettings: true),
-        DashboardBlock(id: "gpu_chart_tiler", title: "block_chart_gpu_tiler", content: .gpuChartTiler(namespace: "chart_GPU_tiler"), hasSettings: true),
-        DashboardBlock(id: "gpu_chart_ane", title: "block_chart_gpu_ane", content: .gpuChartANE(namespace: "chart_GPU_ane"), hasSettings: true),
+        DashboardBlock(id: "gpu_chart_utl", title: "block_chart_gpu_util", content: .gpuChartUtl(namespace: "chart_GPU_utl"), hasSettings: true, helpTopic: .gpuUtilization),
+        DashboardBlock(id: "gpu_chart_render", title: "block_chart_gpu_render", content: .gpuChartRender(namespace: "chart_GPU_render"), hasSettings: true, helpTopic: .gpuRenderer),
+        DashboardBlock(id: "gpu_chart_tiler", title: "block_chart_gpu_tiler", content: .gpuChartTiler(namespace: "chart_GPU_tiler"), hasSettings: true, helpTopic: .gpuTiler),
+        DashboardBlock(id: "gpu_chart_ane", title: "block_chart_gpu_ane", content: .gpuChartANE(namespace: "chart_GPU_ane"), hasSettings: true, helpTopic: .gpuNeuralEngine),
     ]
     
     var body: some View {

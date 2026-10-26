@@ -32,8 +32,7 @@ struct RAMDetailsView: View {
             }
             if showSwap {
                 HStack {
-                    Text("memory_swap_used")
-                        .help("memory_swap_help")
+                    MetricHelpLabel(title: "memory_swap_used", topic: .memorySwap)
                     Spacer()
 
                     if let swapUsedBytes = vm.swapUsedBytes {
@@ -45,8 +44,7 @@ struct RAMDetailsView: View {
             }
             if showMemoryPressure {
                 HStack {
-                    Text("memory_pressure")
-                        .help("memory_pressure_help")
+                    MetricHelpLabel(title: "memory_pressure", topic: .memoryPressure)
                     Spacer()
 
                     switch vm.memoryPressure {

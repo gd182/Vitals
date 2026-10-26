@@ -5,6 +5,11 @@ cd "$(dirname "$0")/.."
 check_dir=$(mktemp -d "${TMPDIR:-/tmp}/vitals-checks.XXXXXX")
 
 xcrun swiftc -swift-version 5 -Onone -module-cache-path "$check_dir/swift-cache" \
+    Tests/MetricHelpTests.swift Vitals/Models/MetricHelpTopic.swift \
+    -o "$check_dir/metric-help-tests"
+"$check_dir/metric-help-tests" Localizable.xcstrings
+
+xcrun swiftc -swift-version 5 -Onone -module-cache-path "$check_dir/swift-cache" \
     Tests/PopoverResizeTests.swift Vitals/Utils/PopoverResizeAnimator.swift \
     -o "$check_dir/popover-resize-tests"
 "$check_dir/popover-resize-tests"

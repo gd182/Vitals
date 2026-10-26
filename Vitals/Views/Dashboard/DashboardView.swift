@@ -62,7 +62,7 @@ struct DashboardView: View {
                         if let block = blocks.first(where: { $0.id == id }),
                            isEditing || config.isVisible(id: id) {
                             VStack(alignment: .leading, spacing: compact ? 4 : 8) {
-                                if isEditing || sectionTitles {
+                                if isEditing || sectionTitles || block.helpTopic != nil {
                                 HStack(spacing: 8) {
                                     if isEditing {
                                         Toggle(block.title, isOn: Binding(
@@ -70,8 +70,11 @@ struct DashboardView: View {
                                             set: { config.setVisible(id: id, $0) }
                                         ))
                                         .toggleStyle(.checkbox)
-                                    } else {
+                                    } else if sectionTitles {
                                         Text(block.title).font(.caption.weight(.semibold)).foregroundStyle(.secondary)
+                                    }
+                                    if let topic = block.helpTopic {
+                                        MetricHelpButton(topic: topic)
                                     }
                                     Spacer(minLength: 4)
                                     if isEditing {

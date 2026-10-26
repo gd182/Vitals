@@ -15,7 +15,7 @@ struct ProcessResizeProbeView: View {
     var body: some View {
         VStack(spacing: 4) {
             Text("Processes").frame(height: 36)
-            ProcessListView(state: probe.state, processes: probe.processes, formattedValue: format)
+            ProcessListView(state: probe.state, processes: probe.processes, visibleRows: 5, formattedValue: format)
         }
         .padding(12)
         .frame(width: 360)

@@ -68,28 +68,30 @@ struct SettingsPreferencesTests {
         let suite = "VitalsProcessRowsTests.\(UUID().uuidString)"
         let defaults = UserDefaults(suiteName: suite)!
         defer { defaults.removePersistentDomain(forName: suite) }
+        let defaultRows = ProcessListLayout.defaultVisibleRows
+        assert(ProcessListLayout.visibleRowRange.contains(defaultRows))
         let cpu = ProcessRowsPreferencesProbe(key: "cpuProcessVisibleRows", defaults: defaults)
         let ram = ProcessRowsPreferencesProbe(key: "ramProcessVisibleRows", defaults: defaults)
-        assert(cpu.rows == 5 && ram.rows == 5)
+        assert(cpu.rows == defaultRows && ram.rows == defaultRows)
         for rows in ProcessListLayout.visibleRowRange {
             cpu.rows = rows
             assert(defaults.integer(forKey: "cpuProcessVisibleRows") == rows)
             assert(ProcessRowsPreferencesProbe(key: "cpuProcessVisibleRows", defaults: defaults).rows == rows)
-            assert(ram.rows == 5)
+            assert(ram.rows == defaultRows)
         }
         cpu.rows = 3
         ram.rows = 10
         for invalid: Any in [-1, 0, 2, 11, Int.max, "invalid"] {
             defaults.set(invalid, forKey: "ramProcessVisibleRows")
-            assert(ProcessRowsPreferencesProbe(key: "ramProcessVisibleRows", defaults: defaults).rows == 5)
+            assert(ProcessRowsPreferencesProbe(key: "ramProcessVisibleRows", defaults: defaults).rows == defaultRows)
             assert(cpu.rows == 3)
         }
         ram.rows = 8
         defaults.set("value", forKey: "ramIndicatorStyle")
         cpu.rows = ProcessListLayout.defaultVisibleRows
-        assert(cpu.rows == 5 && ram.rows == 8)
+        assert(cpu.rows == defaultRows && ram.rows == 8)
         ram.rows = ProcessListLayout.defaultVisibleRows
-        assert(cpu.rows == 5 && ram.rows == 5)
+        assert(cpu.rows == defaultRows && ram.rows == defaultRows)
         assert(defaults.string(forKey: "ramIndicatorStyle") == "value")
         print("Process row limits, persistence, invalid values and independent resets passed")
     }

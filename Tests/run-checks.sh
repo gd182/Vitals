@@ -3,6 +3,14 @@ set -eu
 
 cd "$(dirname "$0")/.."
 check_dir=$(mktemp -d "${TMPDIR:-/tmp}/vitals-checks.XXXXXX")
+machine_arch=$(uname -m)
+cxx_flags=(-std=gnu++23 -mmacosx-version-min=14.6 -Werror=unguarded-availability)
+
+for architecture in arm64 x86_64; do
+    xcrun clang++ "${cxx_flags[@]}" -arch "$architecture" -O2 -Wall -Wextra -Werror \
+        Tests/Cxx23Tests.cpp -o "$check_dir/cxx23-tests-$architecture"
+done
+"$check_dir/cxx23-tests-$machine_arch"
 
 xcrun swiftc -swift-version 5 -Onone -module-cache-path "$check_dir/swift-cache" \
     Tests/MetricHelpTests.swift Vitals/Models/MetricHelpTopic.swift \
@@ -19,7 +27,7 @@ xcrun swiftc -swift-version 5 -Onone -module-cache-path "$check_dir/swift-cache"
     -o "$check_dir/app-build-info-tests"
 "$check_dir/app-build-info-tests"
 
-xcrun clang++ -std=gnu++20 -O2 -fobjc-arc -I Vitals/Core -I Vitals/Bridge \
+xcrun clang++ "${cxx_flags[@]}" -O2 -fobjc-arc -I Vitals/Core -I Vitals/Bridge \
     Tests/MemoryDetailsTests.mm Vitals/Bridge/SystemMonitor.mm \
     Vitals/Core/CPUStats.cpp Vitals/Core/MemoryStats.cpp \
     Vitals/Core/GPUStats.cpp Vitals/Core/ProcessStats.cpp \
@@ -28,12 +36,12 @@ xcrun clang++ -std=gnu++20 -O2 -fobjc-arc -I Vitals/Core -I Vitals/Bridge \
     -o "$check_dir/memory-details-tests"
 "$check_dir/memory-details-tests"
 
-xcrun clang++ -std=gnu++20 -O2 -Wall -Wextra -Werror -I Vitals/Core \
+xcrun clang++ "${cxx_flags[@]}" -O2 -Wall -Wextra -Werror -I Vitals/Core \
     Tests/ProcessNamesTests.cpp Vitals/Core/ProcessNames.cpp \
     -o "$check_dir/process-name-tests"
 "$check_dir/process-name-tests"
 
-xcrun clang++ -std=gnu++20 -O2 -I Vitals/Core Tests/CoreMetricsTests.cpp \
+xcrun clang++ "${cxx_flags[@]}" -O2 -I Vitals/Core Tests/CoreMetricsTests.cpp \
     Vitals/Core/CPUStats.cpp Vitals/Core/MemoryStats.cpp \
     Vitals/Core/GPUStats.cpp Vitals/Core/ProcessStats.cpp \
     Vitals/Core/ProcessNames.cpp \
@@ -83,7 +91,6 @@ xcrun swiftc -swift-version 5 -Onone \
     -o "$check_dir/update-tests"
 "$check_dir/update-tests"
 
-machine_arch=$(uname -m)
 xcodebuild -quiet -project Vitals.xcodeproj -scheme Vitals -testPlan Vitals \
     -configuration Debug -destination "platform=macOS,arch=$machine_arch" \
     -derivedDataPath "$check_dir/native-tests" \

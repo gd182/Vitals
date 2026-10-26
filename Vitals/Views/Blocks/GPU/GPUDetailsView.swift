@@ -29,7 +29,7 @@ struct GPUDetailsView: View {
             }
             #endif
             HStack {
-                Text("memory_total")
+                MetricHelpLabel(title: "memory_total", topic: .gpuMemory)
                 Spacer()
                 Text(Format.formatBytes(vm.gpuVramTotal))
             }

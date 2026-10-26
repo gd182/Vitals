@@ -26,6 +26,87 @@ struct ProcessResizeProbeView: View {
 
 @main
 struct PopoverSmokeTests {
+    @MainActor static func checkMetricHelpGeometry() {
+        for topic in MetricHelpTopic.allCases {
+            for language in ["en", "ru", "de"] {
+                for scheme in [ColorScheme.light, .dark] {
+                    let view = NSHostingView(rootView:
+                        MetricHelpView(topic: topic)
+                            .environment(\.locale, Locale(identifier: language))
+                            .preferredColorScheme(scheme)
+                    )
+                    let size = view.fittingSize
+                    assert(abs(size.width - 300) < 1 && size.height > 60 && size.height < 400)
+                }
+            }
+        }
+        print("RAM/GPU explanation geometry checks passed in RU/EN/DE and both themes")
+    }
+
+    @MainActor static func click(_ point: NSPoint, in view: NSView) {
+        let window = view.window!
+        let location = view.convert(point, to: nil)
+        for type in [NSEvent.EventType.leftMouseDown, .leftMouseUp] {
+            let event = NSEvent.mouseEvent(with: type, location: location, modifierFlags: [],
+                timestamp: ProcessInfo.processInfo.systemUptime, windowNumber: window.windowNumber,
+                context: nil, eventNumber: 1, clickCount: 1, pressure: type == .leftMouseDown ? 1 : 0)!
+            NSApp.postEvent(event, atStart: false)
+        }
+    }
+
+    @MainActor static func helpInteractionSteps(
+        for topics: [MetricHelpTopic], in popover: NSPopover, anchor: @escaping () -> NSView
+    ) -> [(Double, @MainActor () -> Void)] {
+        var steps: [(Double, @MainActor () -> Void)] = []
+        for topic in topics {
+            var knownWindows = Set<Int>()
+            var helpWindow: NSWindow?
+            steps.append((0.2, {
+                let controller = NSHostingController(rootView:
+                    MetricHelpButton(topic: topic).frame(width: 80, height: 80)
+                )
+                controller.sizingOptions = [.preferredContentSize]
+                popover.animates = false
+                popover.contentViewController = controller
+                let button = anchor()
+                popover.show(relativeTo: button.bounds, of: button, preferredEdge: .minY)
+            }))
+            steps.append((0.2, {
+                knownWindows = Set(NSApp.windows.filter(\.isVisible).map(\.windowNumber))
+                let view = popover.contentViewController!.view
+                click(NSPoint(x: view.bounds.midX, y: view.bounds.midY), in: view)
+            }))
+            steps.append((0.4, {
+                assert(popover.isShown)
+                helpWindow = NSApp.windows.first { $0.isVisible && !knownWindows.contains($0.windowNumber) }
+                guard let window = helpWindow else { fatalError("Help did not open for \(topic.titleKey)") }
+                snapshot(window, name: "help-\(topic.titleKey)")
+                // AppKit's popover chrome surrounds the 300-point SwiftUI content.
+                let bounds = window.contentView!.bounds
+                assert(bounds.width >= 300 && bounds.width <= 340 && bounds.height < 400)
+                if topic == .memoryPressure || topic == .gpuNeuralEngine {
+                    let escape = NSEvent.keyEvent(with: .keyDown, location: .zero, modifierFlags: [],
+                        timestamp: ProcessInfo.processInfo.systemUptime, windowNumber: window.windowNumber,
+                        context: nil, characters: "\u{1b}", charactersIgnoringModifiers: "\u{1b}",
+                        isARepeat: false, keyCode: 53)!
+                    if !window.performKeyEquivalent(with: escape) { NSApp.sendEvent(escape) }
+                } else {
+                    let view = window.contentView!
+                    let inset = (view.bounds.width - 300) / 2 + 28
+                    let y = view.isFlipped ? view.bounds.minY + inset : view.bounds.maxY - inset
+                    click(NSPoint(x: view.bounds.maxX - inset, y: y), in: view)
+                }
+            }))
+            steps.append((0.3, {
+                assert(helpWindow?.isVisible == false)
+                assert(popover.isShown, "Closing an explanation must not close its parent panel")
+                popover.close()
+                popover.contentViewController = nil
+            }))
+        }
+        return steps
+    }
+
     @MainActor static func checkProcessListGeometry() {
         let processes = (1...10).map { index in
             ProcessUsage(id: Int32(index), name: "A long process name \(index)", value: Double(index))
@@ -105,6 +186,7 @@ struct PopoverSmokeTests {
     @MainActor static func main() {
         let app = NSApplication.shared
         checkProcessListGeometry()
+        checkMetricHelpGeometry()
         let workspaceEvents = NotificationCenter()
         let delegate = AppDelegate(workspaceNotificationCenter: workspaceEvents)
         overrideDefaults(["panelWidth": 360.0, "processUpdateInterval": 0.5, "panelCompact": true, "panelSectionTitles": true,
@@ -210,6 +292,10 @@ struct PopoverSmokeTests {
                 resizePopover.contentViewController = nil
             }))
         }
+        let helpPopover = NSPopover()
+        helpPopover.behavior = .applicationDefined
+        steps += helpInteractionSteps(for: MetricHelpTopic.allCases, in: helpPopover,
+                                      anchor: { delegate.statusItemGPU!.button! })
         for _ in 0..<3 {
             steps.append((0.3, { delegate.toggleCPUPopover() }))
             steps.append((0.7, {
@@ -245,6 +331,13 @@ struct PopoverSmokeTests {
             assert(delegate.popoverGPU.isShown)
             snapshot(delegate.popoverGPU.contentViewController!.view.window!, name: "panel-gpu")
             assert(delegate.popoverGPU.contentViewController!.view.bounds.height <= 600)
+        }))
+        steps.append((0.2, { overrideDefaults(["panelSectionTitles": false]) }))
+        steps.append((0.3, {
+            snapshot(delegate.popoverGPU.contentViewController!.view.window!, name: "gpu-help-without-titles")
+        }))
+        steps.append((0.2, {
+            overrideDefaults(["panelSectionTitles": true])
             overrideDefaults(["panelWidth": 420.0, "appearance": "light"])
         }))
         steps.append((0.4, {

@@ -12,4 +12,5 @@ struct DashboardBlock: Identifiable {
     let title: LocalizedStringKey
     let content: BlockContent
     var hasSettings: Bool
+    var helpTopic: MetricHelpTopic? = nil
 }

@@ -1465,6 +1465,53 @@
         }
       }
     },
+    "process_visible_rows" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Maximal sichtbare Prozesszeilen"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Maximum visible process rows"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Максимум видимых строк процессов"
+          }
+        }
+      }
+    },
+    "settings_quit" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "de" : { "stringUnit" : { "state" : "translated", "value" : "Vitals beenden" } },
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Quit Vitals" } },
+        "ru" : { "stringUnit" : { "state" : "translated", "value" : "Выйти из Vitals" } }
+      }
+    },
+    "settings_app_version" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "de" : { "stringUnit" : { "state" : "translated", "value" : "App-Version" } },
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "App version" } },
+        "ru" : { "stringUnit" : { "state" : "translated", "value" : "Версия приложения" } }
+      }
+    },
+    "settings_app_build" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "de" : { "stringUnit" : { "state" : "translated", "value" : "Build" } },
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Build" } },
+        "ru" : { "stringUnit" : { "state" : "translated", "value" : "Номер сборки" } }
+      }
+    },
     "settings_theme" : {
       "extractionState" : "manual",
       "localizations" : {

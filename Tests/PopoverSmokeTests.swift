@@ -1,8 +1,76 @@
 import AppKit
 import SwiftUI
 
+@MainActor
+final class ProcessResizeProbe: ObservableObject {
+    @Published var state = ProcessListState.loading
+    @Published var processes: [ProcessUsage] = []
+}
+
+struct ProcessResizeProbeView: View {
+    @ObservedObject var probe: ProcessResizeProbe
+    let format: (ProcessUsage) -> String
+    let onSizeChange: (CGSize) -> Void
+
+    var body: some View {
+        VStack(spacing: 4) {
+            Text("Processes").frame(height: 36)
+            ProcessListView(state: probe.state, processes: probe.processes, visibleRows: 5, formattedValue: format)
+        }
+        .padding(12)
+        .frame(width: 360)
+        .fixedSize(horizontal: false, vertical: true)
+        .onGeometryChange(for: CGSize.self, of: { $0.size }, action: onSizeChange)
+    }
+}
+
 @main
 struct PopoverSmokeTests {
+    @MainActor static func checkProcessListGeometry() {
+        let processes = (1...10).map { index in
+            ProcessUsage(id: Int32(index), name: "A long process name \(index)", value: Double(index))
+        }
+        for visibleRows in [3, 5, 10, 0, 99] {
+            for width: CGFloat in [328, 336, 388, 396] {
+                for language in ["en", "ru", "de"] {
+                    let scenarios: [(ProcessListState, [ProcessUsage])] = [
+                        (.inactive, []), (.loading, []), (.ready, []),
+                        (.ready, Array(processes.prefix(1))),
+                        (.ready, Array(processes.prefix(3))), (.ready, processes)
+                    ]
+                    var heights: [CGFloat] = []
+                    for (state, entries) in scenarios {
+                        let view = NSHostingView(rootView:
+                            ProcessListView(state: state, processes: entries, visibleRows: visibleRows) { _ in "999.99 GB" }
+                                .frame(width: width)
+                                .environment(\.locale, Locale(identifier: language))
+                        )
+                        let size = view.fittingSize
+                        assert(abs(size.width - width) < 1)
+                        assert(size.height >= 0 && size.height < 300)
+                        heights.append(size.height)
+                    }
+                    assert(heights[0] < 1)
+                    assert(heights.dropFirst().allSatisfy { $0 > 0 })
+                    let rows = ProcessListLayout.validatedVisibleRows(visibleRows)
+                    assert(heights[1] < heights[5] && heights[2] < heights[5])
+                    assert(abs(heights[3] - ProcessRow.height) < 1)
+                    assert(abs(heights[4] - (3 * ProcessRow.height + 2 * 4)) < 1)
+                    assert(abs(heights[5] - (CGFloat(rows) * ProcessRow.height + CGFloat(rows - 1) * 4)) < 1)
+                }
+            }
+        }
+        print("Dynamic process list loading, empty, short and capped geometry checks passed")
+    }
+
+    @MainActor static func firstScrollView(in view: NSView) -> NSScrollView? {
+        if let scrollView = view as? NSScrollView { return scrollView }
+        for child in view.subviews {
+            if let scrollView = firstScrollView(in: child) { return scrollView }
+        }
+        return nil
+    }
+
     @MainActor static func overrideDefaults(_ values: [String: Any]) {
         var domain = UserDefaults.standard.volatileDomain(forName: UserDefaults.argumentDomain)
         domain.merge(values) { _, new in new }
@@ -36,9 +104,11 @@ struct PopoverSmokeTests {
 
     @MainActor static func main() {
         let app = NSApplication.shared
+        checkProcessListGeometry()
         let workspaceEvents = NotificationCenter()
         let delegate = AppDelegate(workspaceNotificationCenter: workspaceEvents)
-        overrideDefaults(["panelWidth": 360.0, "processUpdateInterval": 0.5, "panelCompact": true, "panelSectionTitles": true])
+        overrideDefaults(["panelWidth": 360.0, "processUpdateInterval": 0.5, "panelCompact": true, "panelSectionTitles": true,
+                         "cpuProcessVisibleRows": 5, "ramProcessVisibleRows": 5])
         for (module, ids) in [
             "CPU": ["cpu_indicators", "cpu_details", "cpu_chart", "cpu_processes"],
             "RAM": ["ram_indicators", "ram_details", "ram_chart", "ram_processes"],
@@ -67,6 +137,79 @@ struct PopoverSmokeTests {
             delegate.popoverRAM.animates = false
             delegate.popoverGPU.animates = false
         })]
+        let resizePopover = NSPopover()
+        resizePopover.behavior = .applicationDefined
+        let resizeAnimator = PopoverResizeAnimator(popover: resizePopover, reduceMotion: { false })
+        let resizeProbe = ProcessResizeProbe()
+        var resizeFrames: [NSRect] = []
+        var resizeSamplingTask: Task<Void, Never>?
+        var resizeInitialSize = NSSize.zero
+        for format in ["99.9%", "999.9 GB"] {
+            steps.append((0.3, {
+                resizeProbe.state = .loading
+                resizeProbe.processes = []
+                resizePopover.animates = false
+                let controller = NSHostingController(rootView:
+                    ProcessResizeProbeView(probe: resizeProbe, format: { _ in format }) { size in
+                        resizeAnimator.resize(to: size)
+                    }
+                )
+                controller.sizingOptions = []
+                resizePopover.contentViewController = controller
+                let button = delegate.statusItemCPU!.button!
+                resizePopover.show(relativeTo: button.bounds, of: button, preferredEdge: .minY)
+            }))
+            steps.append((0.3, {
+                assert(resizePopover.isShown)
+                resizeInitialSize = resizePopover.contentSize
+                resizeFrames = [resizePopover.contentViewController!.view.window!.frame]
+                snapshot(resizePopover.contentViewController!.view.window!, name: "process-resize-loading")
+                resizePopover.animates = true
+                resizeSamplingTask = Task { @MainActor in
+                    while !Task.isCancelled {
+                        if let frame = resizePopover.contentViewController?.view.window?.frame {
+                            resizeFrames.append(frame)
+                        }
+                        try? await Task.sleep(for: .milliseconds(8))
+                    }
+                }
+                resizeProbe.processes = (1...10).map {
+                    ProcessUsage(id: Int32($0), name: "Process \($0)", value: Double($0))
+                }
+                resizeProbe.state = .ready
+            }))
+            steps.append((0.6, {
+                resizeSamplingTask?.cancel()
+                resizeSamplingTask = nil
+                assert(resizePopover.contentSize.height > resizeInitialSize.height + 50)
+                assert(abs(resizePopover.contentSize.width - resizeInitialSize.width) < 1)
+                let initialFrame = resizeFrames[0]
+                assert(resizeFrames.allSatisfy { abs($0.maxY - initialFrame.maxY) < 2 },
+                       "Process popover moved its top edge during expansion")
+                let finalHeight = resizeFrames.last!.height
+                let intermediate = resizeFrames.filter {
+                    $0.height > initialFrame.height + 1 && $0.height < finalHeight - 1
+                }.count
+                assert(intermediate >= 3, "Expected actual intermediate window sizes, not a single resize")
+                assert(zip(resizeFrames, resizeFrames.dropFirst()).allSatisfy { $1.height >= $0.height - 1 },
+                       "Process popover changed direction during expansion")
+                assert(!resizeAnimator.isAnimating)
+                print("Process popover controlled expansion (\(format)): \(intermediate) intermediate sizes; top edge stable")
+                snapshot(resizePopover.contentViewController!.view.window!, name: "process-resize-ready")
+                let scrollView = firstScrollView(in: resizePopover.contentViewController!.view)!
+                let document = scrollView.documentView!
+                assert(document.bounds.height > scrollView.contentView.bounds.height + 50,
+                       "The remaining process rows must be scrollable, not discarded")
+                scrollView.contentView.scroll(to: NSPoint(x: 0, y: document.bounds.maxY - scrollView.contentView.bounds.height))
+                scrollView.reflectScrolledClipView(scrollView.contentView)
+                assert(scrollView.contentView.bounds.minY > 0)
+                snapshot(resizePopover.contentViewController!.view.window!, name: "process-list-scrolled")
+                resizeAnimator.cancel()
+                resizePopover.animates = false
+                resizePopover.close()
+                resizePopover.contentViewController = nil
+            }))
+        }
         for _ in 0..<3 {
             steps.append((0.3, { delegate.toggleCPUPopover() }))
             steps.append((0.7, {

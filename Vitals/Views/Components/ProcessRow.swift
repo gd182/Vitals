@@ -1,6 +1,8 @@
 import SwiftUI
 
 struct ProcessRow: View {
+    static let height: CGFloat = 20
+
     let process: ProcessUsage
     let value: String
     @State private var icon: NSImage?
@@ -21,6 +23,7 @@ struct ProcessRow: View {
         }
         .padding(.vertical, 2)
         .font(.caption)
+        .frame(height: Self.height)
         .task(id: "\(process.id)-\(process.name)") {
             icon = NSRunningApplication(processIdentifier: process.id)?.icon
         }

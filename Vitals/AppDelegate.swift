@@ -17,6 +17,8 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate, NSWindowD
     var popoverCPU = NSPopover()
     var popoverRAM = NSPopover()
     var popoverGPU = NSPopover()
+    private lazy var cpuResizeAnimator = PopoverResizeAnimator(popover: popoverCPU)
+    private lazy var ramResizeAnimator = PopoverResizeAnimator(popover: popoverRAM)
     private var subscriptions: [MenuBarModule: AnyCancellable] = [:]
 
     var langManager = LanguageManager()
@@ -236,14 +238,15 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate, NSWindowD
             closePopovers(except: popoverCPU)
             let controller = NSHostingController(rootView:
                 LocalizedRoot(langManager: self.langManager) {
-                    CPUView(onSizeChange: { [weak popover = self.popoverCPU] size in
-                        popover?.contentSize = size
+                    CPUView(onSizeChange: { [weak animator = self.cpuResizeAnimator] size in
+                        animator?.resize(to: size)
                     })
                         .environmentObject(self.vm)
                         .environmentObject(self.langManager)
                 }
             )
-            controller.sizingOptions = [.preferredContentSize]
+            // The resize animator is the only owner of CPU/RAM popover size updates.
+            controller.sizingOptions = []
             popoverCPU.contentViewController = controller
             if let button = statusItemCPU?.button {
                 vm.setPopoverVisible(true, module: "CPU")
@@ -264,14 +267,14 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate, NSWindowD
             closePopovers(except: popoverRAM)
             let controller = NSHostingController(rootView:
                 LocalizedRoot(langManager: self.langManager) {
-                    RAMView(onSizeChange: { [weak popover = self.popoverRAM] size in
-                        popover?.contentSize = size
+                    RAMView(onSizeChange: { [weak animator = self.ramResizeAnimator] size in
+                        animator?.resize(to: size)
                     })
                         .environmentObject(self.vm)
                         .environmentObject(self.langManager)
                 }
             )
-            controller.sizingOptions = [.preferredContentSize]
+            controller.sizingOptions = []
             popoverRAM.contentViewController = controller
             if let button = statusItemRAM?.button {
                 vm.setPopoverVisible(true, module: "RAM")
@@ -318,6 +321,11 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate, NSWindowD
         }
     }
 
+    func popoverWillClose(_ notification: Notification) {
+        if notification.object as? NSPopover === popoverCPU { cpuResizeAnimator.cancel() }
+        if notification.object as? NSPopover === popoverRAM { ramResizeAnimator.cancel() }
+    }
+
     func popoverDidClose(_ notification: Notification) {
         guard let popover = notification.object as? NSPopover else { return }
         let module = popover === popoverCPU ? "CPU" : popover === popoverRAM ? "RAM" : "GPU"
@@ -338,6 +346,8 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate, NSWindowD
     }
 
     func applicationWillTerminate(_ notification: Notification) {
+        cpuResizeAnimator.cancel()
+        ramResizeAnimator.cancel()
         automaticUpdateScheduler.stop()
     }
 

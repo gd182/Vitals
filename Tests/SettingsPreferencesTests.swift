@@ -15,6 +15,20 @@ private struct RAMIndicatorPreferencesProbe {
     }
 }
 
+@MainActor
+private struct ProcessRowsPreferencesProbe {
+    @AppStorage private var storedRows: Int
+
+    init(key: String, defaults: UserDefaults) {
+        _storedRows = AppStorage(wrappedValue: ProcessListLayout.defaultVisibleRows, key, store: defaults)
+    }
+
+    var rows: Int {
+        get { ProcessListLayout.validatedVisibleRows(storedRows) }
+        nonmutating set { storedRows = ProcessListLayout.validatedVisibleRows(newValue) }
+    }
+}
+
 @main
 struct SettingsPreferencesTests {
     @MainActor static func main() {
@@ -46,7 +60,40 @@ struct SettingsPreferencesTests {
         layout.reset(ids: ["a", "b", "d"])
         assert(layout.order == ["a", "b", "d"] && layout.isVisible(id: "b"))
         testRAMIndicatorStyle()
+        testProcessRows()
         print("Menu-bar preferences and accessibility fallback checks passed")
+    }
+
+    @MainActor private static func testProcessRows() {
+        let suite = "VitalsProcessRowsTests.\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: suite)!
+        defer { defaults.removePersistentDomain(forName: suite) }
+        let defaultRows = ProcessListLayout.defaultVisibleRows
+        assert(ProcessListLayout.visibleRowRange.contains(defaultRows))
+        let cpu = ProcessRowsPreferencesProbe(key: "cpuProcessVisibleRows", defaults: defaults)
+        let ram = ProcessRowsPreferencesProbe(key: "ramProcessVisibleRows", defaults: defaults)
+        assert(cpu.rows == defaultRows && ram.rows == defaultRows)
+        for rows in ProcessListLayout.visibleRowRange {
+            cpu.rows = rows
+            assert(defaults.integer(forKey: "cpuProcessVisibleRows") == rows)
+            assert(ProcessRowsPreferencesProbe(key: "cpuProcessVisibleRows", defaults: defaults).rows == rows)
+            assert(ram.rows == defaultRows)
+        }
+        cpu.rows = 3
+        ram.rows = 10
+        for invalid: Any in [-1, 0, 2, 11, Int.max, "invalid"] {
+            defaults.set(invalid, forKey: "ramProcessVisibleRows")
+            assert(ProcessRowsPreferencesProbe(key: "ramProcessVisibleRows", defaults: defaults).rows == defaultRows)
+            assert(cpu.rows == 3)
+        }
+        ram.rows = 8
+        defaults.set("value", forKey: "ramIndicatorStyle")
+        cpu.rows = ProcessListLayout.defaultVisibleRows
+        assert(cpu.rows == defaultRows && ram.rows == 8)
+        ram.rows = ProcessListLayout.defaultVisibleRows
+        assert(cpu.rows == defaultRows && ram.rows == defaultRows)
+        assert(defaults.string(forKey: "ramIndicatorStyle") == "value")
+        print("Process row limits, persistence, invalid values and independent resets passed")
     }
 
     @MainActor private static func testRAMIndicatorStyle() {

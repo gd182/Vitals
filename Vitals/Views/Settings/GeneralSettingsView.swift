@@ -14,6 +14,7 @@ struct GeneralSettingsView: View {
     @EnvironmentObject private var updateChecker: UpdateChecker
 
     @State private var updateTask: Task<Void, Never>?
+    private let appBuildInfo = AppBuildInfo()
 
     var body: some View {
         Form {
@@ -45,6 +46,14 @@ struct GeneralSettingsView: View {
                 .pickerStyle(.menu)
             }
             Section("settings_updates") {
+                LabeledContent("settings_app_version") {
+                    Text(verbatim: appBuildInfo.version ?? "N/A")
+                        .textSelection(.enabled)
+                }
+                LabeledContent("settings_app_build") {
+                    Text(verbatim: appBuildInfo.build ?? "N/A")
+                        .textSelection(.enabled)
+                }
                 Toggle(
                     "updates_automatic_checks",
                     isOn: $automaticUpdateChecks

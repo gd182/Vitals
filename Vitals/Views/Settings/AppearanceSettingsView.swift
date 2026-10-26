@@ -11,6 +11,8 @@ struct AppearanceSettingsView: View {
     @AppStorage("ramShowMemoryPressure") private var showMemoryPressure = true
     @AppStorage("ramIndicatorStyle")
         private var ramIndicatorStyle: RAMIndicatorStyle = .ring
+    @AppStorage("cpuProcessVisibleRows") private var cpuProcessRows = ProcessListLayout.defaultVisibleRows
+    @AppStorage("ramProcessVisibleRows") private var ramProcessRows = ProcessListLayout.defaultVisibleRows
 
     private var palette = UsagePalette()
 
@@ -47,7 +49,15 @@ struct AppearanceSettingsView: View {
                 .pickerStyle(.segmented)
                 Toggle("panel_section_titles", isOn: $sectionTitles)
                 Toggle("chart_fill", isOn: $chartFill)
+                Section("CPU") {
+                    processRowsStepper($cpuProcessRows)
+                    Button { cpuProcessRows = ProcessListLayout.defaultVisibleRows } label: {
+                        Image(systemName: "arrow.counterclockwise")
+                    }
+                    .help("panel_reset")
+                }
                 Section("RAM") {
+                    processRowsStepper($ramProcessRows)
                     Picker("ram_indicator_style", selection: $ramIndicatorStyle) {
                         Text("ram_indicator_ring")
                             .tag(RAMIndicatorStyle.ring)
@@ -60,6 +70,7 @@ struct AppearanceSettingsView: View {
                             showSwap = true
                             showMemoryPressure = true
                             ramIndicatorStyle = .ring
+                            ramProcessRows = ProcessListLayout.defaultVisibleRows
                         } label: { Image(systemName: "arrow.counterclockwise") }
                         .help("panel_reset")
                 }
@@ -86,5 +97,19 @@ struct AppearanceSettingsView: View {
             }
         }
         .formStyle(.grouped)
+    }
+
+    private func processRowsStepper(_ storedRows: Binding<Int>) -> some View {
+        let rows = Binding(
+            get: { ProcessListLayout.validatedVisibleRows(storedRows.wrappedValue) },
+            set: { storedRows.wrappedValue = ProcessListLayout.validatedVisibleRows($0) }
+        )
+        return Stepper(value: rows, in: ProcessListLayout.visibleRowRange) {
+            HStack {
+                Text("process_visible_rows")
+                Spacer()
+                Text(rows.wrappedValue, format: .number).monospacedDigit()
+            }
+        }
     }
 }

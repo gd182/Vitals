@@ -1465,6 +1465,29 @@
         }
       }
     },
+    "process_visible_rows" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Maximal sichtbare Prozesszeilen"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Maximum visible process rows"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Максимум видимых строк процессов"
+          }
+        }
+      }
+    },
     "settings_quit" : {
       "extractionState" : "manual",
       "localizations" : {

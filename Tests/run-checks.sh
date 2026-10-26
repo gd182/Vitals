@@ -5,6 +5,11 @@ cd "$(dirname "$0")/.."
 check_dir=$(mktemp -d "${TMPDIR:-/tmp}/vitals-checks.XXXXXX")
 
 xcrun swiftc -swift-version 5 -Onone -module-cache-path "$check_dir/swift-cache" \
+    Tests/PopoverResizeTests.swift Vitals/Utils/PopoverResizeAnimator.swift \
+    -o "$check_dir/popover-resize-tests"
+"$check_dir/popover-resize-tests"
+
+xcrun swiftc -swift-version 5 -Onone -module-cache-path "$check_dir/swift-cache" \
     Tests/AppBuildInfoTests.swift Vitals/Models/AppBuildInfo.swift \
     -o "$check_dir/app-build-info-tests"
 "$check_dir/app-build-info-tests"
@@ -53,7 +58,7 @@ xcrun swiftc -swift-version 5 -Onone -module-cache-path "$check_dir/swift-cache"
 
 xcrun swiftc -swift-version 5 -Onone -module-cache-path "$check_dir/swift-cache" \
     Tests/SettingsPreferencesTests.swift Vitals/Models/MenuBarPreferences.swift Vitals/Models/DashboardConfig.swift \
-    Vitals/Models/RAMIndicatorStyle.swift \
+    Vitals/Models/RAMIndicatorStyle.swift Vitals/Models/ProcessListLayout.swift \
     -o "$check_dir/settings-tests"
 "$check_dir/settings-tests"
 

@@ -26,6 +26,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate, NSWindowD
         currentVersion: Bundle.main.object(
             forInfoDictionaryKey: "CFBundleShortVersionString"
         ) as? String,
+        recordSuccessfulCheck: UpdatePreferences().recordSuccessfulCheck(at:),
         fetchReleases: {
             try await GitHubReleaseService().fetchReleases()
         }

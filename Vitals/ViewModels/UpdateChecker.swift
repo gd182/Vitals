@@ -26,6 +26,8 @@ final class UpdateChecker: ObservableObject {
 
     private let currentVersion: String?
     private let fetchReleases: () async throws -> [GitHubRelease]
+    private let clock: () -> Date
+    private let recordSuccessfulCheck: (Date) -> Void
 
     var isChecking: Bool {
         if case .checking = state {
@@ -36,10 +38,14 @@ final class UpdateChecker: ObservableObject {
 
     init(
         currentVersion: String?,
+        clock: @escaping () -> Date = { Date() },
+        recordSuccessfulCheck: @escaping (Date) -> Void = { _ in },
         fetchReleases: @escaping () async throws -> [GitHubRelease]
     ) {
         self.currentVersion = currentVersion
         self.fetchReleases = fetchReleases
+        self.clock = clock
+        self.recordSuccessfulCheck = recordSuccessfulCheck
     }
 
     func checkForUpdates(includePrereleases: Bool) async {
@@ -56,6 +62,7 @@ final class UpdateChecker: ObservableObject {
         do {
             let releases = try await fetchReleases()
             try Task.checkCancellation()
+            recordSuccessfulCheck(clock())
             if let release = UpdateSelector.selectUpdate(
                 from: releases,
                 currentVersion: version,

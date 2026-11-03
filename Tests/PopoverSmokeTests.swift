@@ -26,6 +26,43 @@ struct ProcessResizeProbeView: View {
 
 @main
 struct PopoverSmokeTests {
+    @MainActor static func checkGPUStatusGeometry() {
+        for language in ["en", "ru", "de"] {
+            for state in [ObjCGPUReadState.unavailable, .readFailed, .invalidData] {
+                for width: CGFloat in [300, 360, 420] {
+                    let chart = HistoryChartView(segments: [], namespace: "gpu-status-test",
+                                                 unavailableMessage: state.messageKey)
+                        .frame(width: width)
+                        .environment(\.locale, Locale(identifier: language))
+                    let host = NSHostingView(rootView: chart)
+                    let size = host.fittingSize
+                    assert(abs(size.width - width) < 1 && (24...80).contains(size.height))
+                }
+            }
+        }
+        print("GPU unavailable, failed and invalid chart geometry passed in RU/EN/DE")
+    }
+
+    @MainActor static func checkRenderedGap(in view: NSView) {
+        let bitmap = view.bitmapImageRepForCachingDisplay(in: view.bounds)!
+        view.cacheDisplay(in: view.bounds, to: bitmap)
+        var left = 0, middle = 0, right = 0
+        for x in 0..<bitmap.pixelsWide {
+            for y in 0..<bitmap.pixelsHigh {
+                guard let color = bitmap.colorAt(x: x, y: y)?.usingColorSpace(.deviceRGB),
+                      color.greenComponent > color.redComponent + 0.15,
+                      color.greenComponent > color.blueComponent + 0.15 else { continue }
+                let fraction = Double(x) / Double(bitmap.pixelsWide)
+                if fraction < 0.3 { left += 1 }
+                if fraction > 0.4 && fraction < 0.6 { middle += 1 }
+                if fraction > 0.7 { right += 1 }
+            }
+        }
+        assert(left > 5 && right > 5, "Both valid history runs must be rendered")
+        assert(middle == 0, "Missing samples must not be connected by a stroke or fill")
+        print("Canvas pixel check passed: both history runs visible with an empty gap")
+    }
+
     @MainActor static func checkMetricHelpGeometry() {
         for topic in MetricHelpTopic.allCases {
             for language in ["en", "ru", "de"] {
@@ -187,6 +224,7 @@ struct PopoverSmokeTests {
         let app = NSApplication.shared
         checkProcessListGeometry()
         checkMetricHelpGeometry()
+        checkGPUStatusGeometry()
         let workspaceEvents = NotificationCenter()
         let delegate = AppDelegate(workspaceNotificationCenter: workspaceEvents)
         overrideDefaults(["panelWidth": 360.0, "processUpdateInterval": 0.5, "panelCompact": true, "panelSectionTitles": true,
@@ -296,6 +334,47 @@ struct PopoverSmokeTests {
         helpPopover.behavior = .applicationDefined
         steps += helpInteractionSteps(for: MetricHelpTopic.allCases, in: helpPopover,
                                       anchor: { delegate.statusItemGPU!.button! })
+        let gapPopover = NSPopover()
+        gapPopover.behavior = .applicationDefined
+        steps.append((0.2, {
+            let defaults = UserDefaults(suiteName: "VitalsTests.GPUGap.\(UUID())")!
+            defaults.setVolatileDomain(["panelCompact": false, "chartFill": true,
+                                       "usageColorNormal": 0x00FF00], forName: UserDefaults.argumentDomain)
+            var history = HistoryData()
+            for value in [Float?(40), 40, nil, nil, nil, 40, 40] { history.append(value) }
+            let chart = HistoryChartView(segments: history.segments(warning: 50, critical: 80),
+                                         namespace: "gpu-gap-test")
+                .frame(width: 300).background(Color.white).defaultAppStorage(defaults)
+            gapPopover.contentViewController = NSHostingController(rootView: chart)
+            gapPopover.animates = false
+            let anchor = delegate.statusItemGPU!.button!
+            gapPopover.show(relativeTo: anchor.bounds, of: anchor, preferredEdge: .minY)
+        }))
+        steps.append((0.4, {
+            checkRenderedGap(in: gapPopover.contentViewController!.view)
+            snapshot(gapPopover.contentViewController!.view.window!, name: "gpu-history-gap")
+            gapPopover.close()
+            gapPopover.contentViewController = nil
+        }))
+        for state in [ObjCGPUReadState.unavailable, .readFailed, .invalidData] {
+            steps.append((0.2, {
+                let chart = VStack(spacing: 12) {
+                    CircularIndicator(value: nil, text: "N/A", label: "gpu_label_util")
+                    HistoryChartView(segments: [], namespace: "gpu-unavailable-test",
+                                     unavailableMessage: state.messageKey)
+                }
+                .padding(12).frame(width: 300).background(Color.white)
+                .environment(\.locale, Locale(identifier: "ru")).preferredColorScheme(.light)
+                gapPopover.contentViewController = NSHostingController(rootView: chart)
+                let anchor = delegate.statusItemGPU!.button!
+                gapPopover.show(relativeTo: anchor.bounds, of: anchor, preferredEdge: .minY)
+            }))
+            steps.append((0.3, {
+                snapshot(gapPopover.contentViewController!.view.window!, name: "gpu-\(state.messageKey)")
+                gapPopover.close()
+                gapPopover.contentViewController = nil
+            }))
+        }
         for _ in 0..<3 {
             steps.append((0.3, { delegate.toggleCPUPopover() }))
             steps.append((0.7, {

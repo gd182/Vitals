@@ -10,7 +10,8 @@ struct MetricHelpTests {
         assert(Set(MetricHelpTopic.allCases.map(\.titleKey)).count == 7)
         assert(Set(MetricHelpTopic.allCases.map(\.explanationKey)).count == 7)
         let keys = MetricHelpTopic.allCases.flatMap { [$0.titleKey, $0.explanationKey] } +
-            ["metric_explanation", "metric_explanation_close"]
+            ["metric_explanation", "metric_explanation_close", "gpu_data_unavailable",
+             "gpu_data_read_failed", "gpu_data_invalid"]
         for key in keys {
             let entry = strings[key] as! [String: Any]
             let localizations = entry["localizations"] as! [String: Any]

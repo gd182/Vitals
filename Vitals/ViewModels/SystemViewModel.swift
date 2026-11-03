@@ -2,10 +2,28 @@ import Combine
 import Foundation
 import AppKit
 
+extension ObjCGPUReadState {
+    nonisolated var messageKey: String {
+        switch self {
+        case .available: return ""
+        case .readFailed: return "gpu_data_read_failed"
+        case .invalidData: return "gpu_data_invalid"
+        default: return "gpu_data_unavailable"
+        }
+    }
+}
+
 @MainActor
 final class MenuBarMetric: ObservableObject {
-    @Published private(set) var value: Int = 0
-    func update(from newValue: Float) {
+    @Published private(set) var value: Int?
+
+    init(value: Int? = 0) { self.value = value }
+
+    func update(from newValue: Float?) {
+        guard let newValue else {
+            if value != nil { value = nil }
+            return
+        }
         let rounded = newValue.rounded()
         let nextValue: Int = rounded.isFinite
             ? (Int(exactly: rounded) ?? 0)
@@ -21,9 +39,9 @@ final class MenuBarMetric: ObservableObject {
 final class MenuBarMetrics {
     let cpu = MenuBarMetric()
     let ram = MenuBarMetric()
-    let gpu = MenuBarMetric()
+    let gpu = MenuBarMetric(value: nil)
 
-    func update(cpu: Float, ram: Float, gpu: Float) {
+    func update(cpu: Float, ram: Float, gpu: Float?) {
         self.cpu.update(from: cpu)
         self.ram.update(from: ram)
         self.gpu.update(from: gpu)
@@ -61,6 +79,12 @@ final class SystemViewModel: @MainActor ObservableObject {
     private(set) var gpuANEUtilization: Float = 0
     private(set) var gpuVramUsed: UInt64 = 0
     private(set) var gpuVramTotal: UInt64 = 0
+    private(set) var gpuUtilizationState: ObjCGPUReadState = .unavailable
+    private(set) var gpuRenderUtilizationState: ObjCGPUReadState = .unavailable
+    private(set) var gpuTilerUtilizationState: ObjCGPUReadState = .unavailable
+    private(set) var gpuANEUtilizationState: ObjCGPUReadState = .unavailable
+    private(set) var gpuVramUsedState: ObjCGPUReadState = .unavailable
+    private(set) var gpuVramTotalState: ObjCGPUReadState = .unavailable
     private(set) var warningThreshold: Float = 50
     private(set) var criticalThreshold: Float = 80
     private var processSampleRequested: Bool = false
@@ -367,10 +391,16 @@ final class SystemViewModel: @MainActor ObservableObject {
                     self.gpuANEUtilization = gpu.aneUtilization
                     self.gpuVramUsed = gpu.vramUsed
                     self.gpuVramTotal = gpu.vramTotal
-                    self.gpuUtilHistory.append(gpu.utilization, timestamp: timestamp)
-                    self.gpuRenderHistory.append(gpu.renderUtilization, timestamp: timestamp)
-                    self.gpuTilerHistory.append(gpu.tilerUtilization, timestamp: timestamp)
-                    self.gpuANEHistory.append(gpu.aneUtilization, timestamp: timestamp)
+                    self.gpuUtilizationState = gpu.utilizationState
+                    self.gpuRenderUtilizationState = gpu.renderUtilizationState
+                    self.gpuTilerUtilizationState = gpu.tilerUtilizationState
+                    self.gpuANEUtilizationState = gpu.aneUtilizationState
+                    self.gpuVramUsedState = gpu.vramUsedState
+                    self.gpuVramTotalState = gpu.vramTotalState
+                    self.gpuUtilHistory.append(gpu.utilizationState == .available ? gpu.utilization : nil, timestamp: timestamp)
+                    self.gpuRenderHistory.append(gpu.renderUtilizationState == .available ? gpu.renderUtilization : nil, timestamp: timestamp)
+                    self.gpuTilerHistory.append(gpu.tilerUtilizationState == .available ? gpu.tilerUtilization : nil, timestamp: timestamp)
+                    self.gpuANEHistory.append(gpu.aneUtilizationState == .available ? gpu.aneUtilization : nil, timestamp: timestamp)
                     if self.isMonitoringProcessesCPU, cpuGeneration == self.cpuProcessGeneration, let processesCPU {
                         self.topProcessesByCPU = processesCPU
                         if !resetCPU {
@@ -385,7 +415,8 @@ final class SystemViewModel: @MainActor ObservableObject {
                         ramProcessState = .ready
                     }
                     if self.isMonitoringTemperature, readTemperature { self.cpuTemperature = temperature }
-                    self.menuBarMetrics.update(cpu: cpu.total, ram: memory.usedPercent, gpu: gpu.utilization)
+                    self.menuBarMetrics.update(cpu: cpu.total, ram: memory.usedPercent,
+                                               gpu: gpu.utilizationState == .available ? gpu.utilization : nil)
                     if self.visiblePopovers.isEmpty
                         && !self.isMonitoringProcessesCPU
                         && !self.isMonitoringProcessesRAM {

@@ -16,7 +16,8 @@ struct GPUDetailsView: View {
             HStack {
                 Text("memory_used")
                 Spacer()
-                Text(Format.formatBytes(vm.gpuVramUsed))
+                Text(vm.gpuVramUsedState == .available ? Format.formatBytes(vm.gpuVramUsed) : "N/A")
+                    .help(LocalizedStringKey(vm.gpuVramUsedState.messageKey))
             }
             #if !arch(arm64)
             let free = vm.gpuVramTotal > vm.gpuVramUsed
@@ -25,13 +26,15 @@ struct GPUDetailsView: View {
             HStack {
                 Text("memory_free")
                 Spacer()
-                Text(Format.formatBytes(free))
+                Text(vm.gpuVramUsedState == .available && vm.gpuVramTotalState == .available
+                     ? Format.formatBytes(free) : "N/A")
             }
             #endif
             HStack {
                 MetricHelpLabel(title: "memory_total", topic: .gpuMemory)
                 Spacer()
-                Text(Format.formatBytes(vm.gpuVramTotal))
+                Text(vm.gpuVramTotalState == .available ? Format.formatBytes(vm.gpuVramTotal) : "N/A")
+                    .help(LocalizedStringKey(vm.gpuVramTotalState.messageKey))
             }
         }
         .font(.caption)

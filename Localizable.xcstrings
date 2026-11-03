@@ -595,6 +595,30 @@
         "ru" : { "stringUnit" : { "state" : "translated", "value" : "Занятость Apple Neural Engine — ускорителя задач машинного обучения." } }
       }
     },
+    "gpu_data_unavailable" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "No data available" } },
+        "ru" : { "stringUnit" : { "state" : "translated", "value" : "Данные недоступны" } },
+        "de" : { "stringUnit" : { "state" : "translated", "value" : "Keine Daten verfügbar" } }
+      }
+    },
+    "gpu_data_read_failed" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Could not read data" } },
+        "ru" : { "stringUnit" : { "state" : "translated", "value" : "Не удалось получить данные" } },
+        "de" : { "stringUnit" : { "state" : "translated", "value" : "Daten konnten nicht gelesen werden" } }
+      }
+    },
+    "gpu_data_invalid" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Invalid measurement" } },
+        "ru" : { "stringUnit" : { "state" : "translated", "value" : "Некорректное измерение" } },
+        "de" : { "stringUnit" : { "state" : "translated", "value" : "Ungültiger Messwert" } }
+      }
+    },
     "gpu_memory_title" : {
       "extractionState" : "manual",
       "localizations" : {

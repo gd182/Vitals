@@ -14,22 +14,25 @@ struct GPUIndicatorsView: View {
     var body: some View {
         HStack {
             CircularIndicator(
-                value: Double(vm.gpuRenderUtilization),
-                text: String(format: "%.0f%%", vm.gpuRenderUtilization),
+                value: vm.gpuRenderUtilizationState == .available ? Double(vm.gpuRenderUtilization) : nil,
+                text: vm.gpuRenderUtilizationState == .available ? String(format: "%.0f%%", vm.gpuRenderUtilization) : "N/A",
                 label: "gpu_label_render"
             )
+            .help(LocalizedStringKey(vm.gpuRenderUtilizationState.messageKey))
             .frame(maxWidth: .infinity)
             CircularIndicator(
-                value: Double(vm.gpuUtilization),
-                text: String(format: "%.0f%%", vm.gpuUtilization),
+                value: vm.gpuUtilizationState == .available ? Double(vm.gpuUtilization) : nil,
+                text: vm.gpuUtilizationState == .available ? String(format: "%.0f%%", vm.gpuUtilization) : "N/A",
                 label: "gpu_label_util"
             )
+            .help(LocalizedStringKey(vm.gpuUtilizationState.messageKey))
             .frame(maxWidth: .infinity)
             CircularIndicator(
-                value: Double(vm.gpuTilerUtilization),
-                text: String(format: "%.0f%%", vm.gpuTilerUtilization),
+                value: vm.gpuTilerUtilizationState == .available ? Double(vm.gpuTilerUtilization) : nil,
+                text: vm.gpuTilerUtilizationState == .available ? String(format: "%.0f%%", vm.gpuTilerUtilization) : "N/A",
                 label: "gpu_label_tiler"
             )
+            .help(LocalizedStringKey(vm.gpuTilerUtilizationState.messageKey))
             .frame(maxWidth: .infinity)
         }
         .padding(.vertical, compact ? 4 : 8)

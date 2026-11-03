@@ -8,6 +8,9 @@ struct ObjCCPUUsage { var total: Float; var user: Float; var system: Float; var 
 struct ObjCCPUStatsResult { var average: ObjCCPUUsage }
 struct ObjCMemoryUsage { var totalBytes: UInt64; var usedBytes: UInt64; var usedPercent: Float }
 struct ObjCSwapUsage {var totalBytes: UInt64; var usedBytes: UInt64; var available: ObjCBool}
+enum ObjCGPUReadState: Int {
+    case unavailable = 0, available, readFailed, invalidData
+}
 struct ObjCGPUUsage {
     var utilization: Float = 10
     var renderUtilization: Float = 5
@@ -15,6 +18,12 @@ struct ObjCGPUUsage {
     var aneUtilization: Float = 0
     var vramUsed: UInt64 = 100
     var vramTotal: UInt64 = 1000
+    var utilizationState: ObjCGPUReadState = .available
+    var renderUtilizationState: ObjCGPUReadState = .available
+    var tilerUtilizationState: ObjCGPUReadState = .available
+    var aneUtilizationState: ObjCGPUReadState = .available
+    var vramUsedState: ObjCGPUReadState = .available
+    var vramTotalState: ObjCGPUReadState = .available
 }
 
 enum ObjCMemoryPressure: Int {
@@ -77,7 +86,15 @@ final class SystemMonitor {
     }
     func cpuStats() -> ObjCCPUStatsResult { .init(average: .init(total: 20, user: 15, system: 5, idle: 80)) }
     func memoryUsage() -> ObjCMemoryUsage { .init(totalBytes: 1000, usedBytes: 400, usedPercent: 40) }
-    func gpuUsage() -> ObjCGPUUsage { .init() }
+    private static var gpuResponse = ObjCGPUUsage()
+    static func setGPUResponse(_ value: ObjCGPUUsage) {
+        lock.lock(); defer { lock.unlock() }
+        gpuResponse = value
+    }
+    func gpuUsage() -> ObjCGPUUsage {
+        Self.lock.lock(); defer { Self.lock.unlock() }
+        return Self.gpuResponse
+    }
     func topProcessesByCPU() -> NSArray {
         Self.lock.lock(); Self.cpuReads += 1; Self.lock.unlock()
         return [["pid": 1, "name": "CPU test", "value": 10.0]]
@@ -259,6 +276,7 @@ struct MonitoringTests {
         testRAMDetailsIgnoreClosedPreferenceChanges()
         testRAMDetailsRejectStaleResults()
         testRAMDetailsDisableInFlight()
+        testGPUAvailability()
 
         // History stays bounded and preserves real sample dates with mixed polling intervals.
         var history = HistoryData()
@@ -527,6 +545,38 @@ struct MonitoringTests {
         )
         assert(MonitoringPreferences(defaults: defaults) == original)
         print("RAM detail preference defaults, combinations and change detection checks passed")
+    }
+
+    static func testGPUAvailability() {
+        let defaults = UserDefaults(suiteName: "VitalsTests.GPU.\(UUID())")!
+        defaults.setVolatileDomain(["updateInterval": 0.5, "backgroundUpdateInterval": 0.5],
+                                   forName: UserDefaults.argumentDomain)
+        var vm: SystemViewModel? = SystemViewModel(defaults: defaults)
+        assert(vm!.gpuUtilizationState == .unavailable && vm!.menuBarMetrics.gpu.value == nil)
+        waitUntil { vm!.gpuUtilizationState == .available }
+        let timestamp = vm!.gpuUtilHistory.segments(warning: 50, critical: 80).last!.points.last!.timestamp
+        var missing = ObjCGPUUsage()
+        missing.utilizationState = .readFailed
+        missing.renderUtilizationState = .invalidData
+        missing.aneUtilizationState = .unavailable
+        missing.vramUsedState = .readFailed
+        SystemMonitor.setGPUResponse(missing)
+        waitUntil { vm!.gpuUtilizationState == .readFailed }
+        assert(vm!.gpuRenderUtilizationState == .invalidData && vm!.gpuANEUtilizationState == .unavailable)
+        assert(vm!.gpuTilerUtilizationState == .available && vm!.gpuVramTotalState == .available)
+        assert(vm!.gpuVramUsedState == .readFailed && vm!.menuBarMetrics.gpu.value == nil)
+        assert(vm!.gpuUtilHistory.segments(warning: 50, critical: 80).last!.points.last!.timestamp == timestamp)
+        var idle = ObjCGPUUsage()
+        idle.utilization = 0
+        SystemMonitor.setGPUResponse(idle)
+        waitUntil { vm!.gpuUtilizationState == .available && vm!.gpuUtilization == 0 }
+        assert(vm!.menuBarMetrics.gpu.value == 0)
+        let segments = vm!.gpuUtilHistory.segments(warning: 50, critical: 80)
+        assert(HistoryData.continuousRuns(in: segments).count == 2)
+        assert(segments.last!.points.last!.value == 0)
+        vm = nil
+        SystemMonitor.setGPUResponse(ObjCGPUUsage())
+        print("GPU independent availability, failure, recovery, true zero and history gap checks passed")
     }
 
     static func testMenuBarMetrics() {

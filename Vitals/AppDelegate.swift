@@ -224,7 +224,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate, NSWindowD
                     percent: percent
                 )
                 button.setAccessibilityLabel(
-                    "\(module.title) \(percent)%"
+                    "\(module.title) \(percent.map { "\($0)%" } ?? NSLocalizedString("N/A", comment: ""))"
                 )
             }
         item = statusItem

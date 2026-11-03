@@ -12,7 +12,7 @@ enum MenuBarImageRenderer {
 
     static func render(
         module: MenuBarModule,
-        percent: Int,
+        percent: Int?,
     ) -> NSImage {
         let imageSize = NSSize(width: 36, height: 22)
 
@@ -36,7 +36,7 @@ enum MenuBarImageRenderer {
         )
 
         let value = NSAttributedString(
-            string: "\(percent)%",
+            string: percent.map { "\($0)%" } ?? "N/A",
             attributes: [
                 .font: valueFont,
                 .foregroundColor: NSColor.black

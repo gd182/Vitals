@@ -30,6 +30,13 @@ typedef struct {
     int coreCount;
 } ObjCCPUStatsResult;
 
+typedef NS_ENUM(NSInteger, ObjCGPUReadState) {
+    ObjCGPUReadStateUnavailable = 0,
+    ObjCGPUReadStateAvailable,
+    ObjCGPUReadStateReadFailed,
+    ObjCGPUReadStateInvalidData,
+};
+
 typedef struct {
     float utilization;
     float renderUtilization;
@@ -37,6 +44,12 @@ typedef struct {
     float aneUtilization;
     uint64_t vramUsed;
     uint64_t vramTotal;
+    ObjCGPUReadState utilizationState;
+    ObjCGPUReadState renderUtilizationState;
+    ObjCGPUReadState tilerUtilizationState;
+    ObjCGPUReadState aneUtilizationState;
+    ObjCGPUReadState vramUsedState;
+    ObjCGPUReadState vramTotalState;
 } ObjCGPUUsage;
 
 typedef struct {

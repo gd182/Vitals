@@ -10,6 +10,9 @@ import Foundation
 @MainActor
 final class UpdatePreferences {
     private let defaults: UserDefaults
+    var lastSuccessfulCheck: Date? {
+        defaults.object(forKey: "lastSuccessfulUpdateCheck") as? Date
+    }
 
     init(defaults: UserDefaults = .standard) {
         self.defaults = defaults
@@ -30,5 +33,9 @@ final class UpdatePreferences {
 
     func recordAttempt(at date: Date) {
         defaults.set(date, forKey: "lastAutomaticUpdateAttempt")
+    }
+
+    func recordSuccessfulCheck(at date: Date) {
+        defaults.set(date, forKey: "lastSuccessfulUpdateCheck")
     }
 }

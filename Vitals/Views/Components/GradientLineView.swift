@@ -46,49 +46,46 @@ struct GradientLineView: View {
                 return
             }
 
-            let points = makePoints(
-                from: sourcePoints,
-                size: size,
-                indexRange: indexRange
-            )
-
-            guard points.count > 1 else {
-                return
-            }
-
             let colorScale = UsageColorScale(warning: Float(warningThreshold), critical: Float(criticalThreshold))
-            let categoryGradient = Gradient(stops: colorScale.gradientStops(
-                points: sourcePoints, width: size.width, transitionWidth: transitionWidth
-            ).map { .init(color: palette.color(for: $0.category), location: $0.location) })
+            // Missing samples split both the stroke and its fill.
+            for run in HistoryData.continuousRuns(in: sorted) where run.count > 1 {
+                let points = makePoints(from: run, size: size, indexRange: indexRange)
+                let start = points.first!.x
+                let span = points.last!.x - start
+                let categoryGradient = Gradient(stops: colorScale.gradientStops(
+                    points: run, width: span, transitionWidth: transitionWidth
+                ).map { .init(color: palette.color(for: $0.category),
+                              location: (start + $0.location * span) / max(1, size.width)) })
 
-            if chartFill { drawArea(
-                context: context,
-                points: points,
-                size: size,
-                categoryGradient: categoryGradient
-            ) }
+                if chartFill { drawArea(
+                    context: context,
+                    points: points,
+                    size: size,
+                    categoryGradient: categoryGradient
+                ) }
 
-            let linePath = makePath(points: points)
+                let linePath = makePath(points: points)
 
-            context.stroke(
-                linePath,
-                with: .linearGradient(
-                    categoryGradient,
-                    startPoint: CGPoint(
-                        x: 0,
-                        y: size.height / 2
+                context.stroke(
+                    linePath,
+                    with: .linearGradient(
+                        categoryGradient,
+                        startPoint: CGPoint(
+                            x: 0,
+                            y: size.height / 2
+                        ),
+                        endPoint: CGPoint(
+                            x: size.width,
+                            y: size.height / 2
+                        )
                     ),
-                    endPoint: CGPoint(
-                        x: size.width,
-                        y: size.height / 2
+                    style: StrokeStyle(
+                        lineWidth: lineWidth,
+                        lineCap: .round,
+                        lineJoin: .round
                     )
-                ),
-                style: StrokeStyle(
-                    lineWidth: lineWidth,
-                    lineCap: .round,
-                    lineJoin: .round
                 )
-            )
+            }
         }
         .frame(height: compact ? max(24, height * 0.6) : height)
     }

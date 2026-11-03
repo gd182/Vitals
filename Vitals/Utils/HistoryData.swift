@@ -35,24 +35,26 @@ nonisolated struct HistoryPoint {
 
 struct HistoryData {
     
-    private var buffer = CircularBuffer<(value: Float, timestamp: Date)>(initialCapacity: 60)
+    private var buffer = CircularBuffer<(value: Float?, timestamp: Date)>(initialCapacity: 60)
     
-    mutating func append(_ value: Float, timestamp: Date = Date()) {
-        buffer.append(value: (value, timestamp))
+    mutating func append(_ value: Float?, timestamp: Date = Date()) {
+        buffer.append(value: (value.flatMap { $0.isFinite ? $0 : nil }, timestamp))
     }
     
     func segments(warning: Float, critical: Float) -> [Segment] {
         let colorScale = UsageColorScale(warning: warning, critical: critical)
         var prevPoint: HistoryPoint? = nil
-        var idx = 0
         var segments: [Segment] = []
         for index in 0..<buffer.count {
             guard let sample = buffer.get(index: index) else { continue }
-            let value = sample.value
+            guard let value = sample.value else {
+                prevPoint = nil
+                continue
+            }
             let category = colorScale.category(for: value)
-            let newPoint = HistoryPoint(index: idx, value: value, timestamp: sample.timestamp)
+            let newPoint = HistoryPoint(index: index, value: value, timestamp: sample.timestamp)
             
-            if segments.last?.category == category {
+            if prevPoint != nil && segments.last?.category == category {
                 segments[segments.count - 1].points.append(newPoint)
             } else {
                 segments.append(Segment(
@@ -60,9 +62,21 @@ struct HistoryData {
                     category: category
                 ))
             }
-            idx += 1
             prevPoint = newPoint
         }
         return segments
+    }
+
+    static func continuousRuns(in segments: [Segment]) -> [[HistoryPoint]] {
+        var runs: [[HistoryPoint]] = []
+        for point in segments.flatMap(\.points) {
+            if runs.last?.last?.index == point.index { continue }
+            if let last = runs.last?.last, point.index == last.index + 1 {
+                runs[runs.count - 1].append(point)
+            } else {
+                runs.append([point])
+            }
+        }
+        return runs
     }
 }

@@ -7,6 +7,19 @@
 
 #include <cstdint>
 
+namespace {
+    template<typename T>
+    ObjCGPUReadState gpuReadState(const Vitals::GPUReading<T>& reading)
+    {
+        if (reading) return ObjCGPUReadStateAvailable;
+        switch (reading.error()) {
+            case Vitals::GPUReadError::unavailable: return ObjCGPUReadStateUnavailable;
+            case Vitals::GPUReadError::readFailed: return ObjCGPUReadStateReadFailed;
+            case Vitals::GPUReadError::invalidData: return ObjCGPUReadStateInvalidData;
+        }
+    }
+}
+
 @implementation SystemMonitor {
     Vitals::CPUStats _cpu;
     Vitals::MemoryStats _memory;
@@ -55,7 +68,14 @@
 
 - (ObjCGPUUsage)gpuUsage {
     auto usage = _gpu.getUsage();
-    return { usage.utilization, usage.renderUtilization, usage.tilerUtilization, usage.aneUtilization, usage.vramUsed, usage.vramTotal};
+    return {
+        usage.utilization.value_or(0), usage.renderUtilization.value_or(0),
+        usage.tilerUtilization.value_or(0), usage.aneUtilization.value_or(0),
+        usage.vramUsed.value_or(0), usage.vramTotal.value_or(0),
+        gpuReadState(usage.utilization), gpuReadState(usage.renderUtilization),
+        gpuReadState(usage.tilerUtilization), gpuReadState(usage.aneUtilization),
+        gpuReadState(usage.vramUsed), gpuReadState(usage.vramTotal)
+    };
 }
 
 - (ObjCSwapUsage)swapUsage {

@@ -8,6 +8,18 @@ struct ChartColorTests {
         let unavailable = CircularIndicator(value: nil, text: "N/A", label: "temp")
         assert(unavailable.value == nil)
         let scale = UsageColorScale()
+        var gapped = HistoryData()
+        let date = Date(timeIntervalSince1970: 100)
+        for (index, value) in [Float?(10), 20, nil, 80, 90, .nan, 0, 0].enumerated() {
+            gapped.append(value, timestamp: date.addingTimeInterval(Double(index)))
+        }
+        let runs = HistoryData.continuousRuns(in: gapped.segments(warning: 50, critical: 80))
+        assert(runs.map { $0.map(\.index) } == [[0, 1], [3, 4], [6, 7]])
+        assert(runs[2].allSatisfy { $0.value == 0 })
+        assert(runs[1][0].timestamp == date.addingTimeInterval(3))
+        for _ in 0..<60 { gapped.append(nil) }
+        assert(gapped.segments(warning: 50, critical: 80).isEmpty)
+        print("History gaps split strokes/fills, retain timestamps and expire old samples")
         assert(UsagePalette.encode(Color(red: 1, green: 128.0 / 255, blue: 0)) == 0xFF8000)
         for value in [0, 0xFFFFFF, 0x007AFF, 0xFF2D55] {
             assert(UsagePalette.encode(UsagePalette.decode(value, fallback: .black)) == value)

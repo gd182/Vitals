@@ -12,6 +12,18 @@ for architecture in arm64 x86_64; do
 done
 "$check_dir/cxx23-tests-$machine_arch"
 
+xcrun clang++ "${cxx_flags[@]}" -O2 -Wall -Wextra -Werror -I Vitals/Core \
+    Tests/GPUReadingTests.cpp -o "$check_dir/gpu-reading-tests"
+"$check_dir/gpu-reading-tests"
+
+xcrun clang++ "${cxx_flags[@]}" -O2 -fobjc-arc -I Vitals/Core -I Vitals/Bridge \
+    Tests/GPUStatsTests.mm Vitals/Bridge/SystemMonitor.mm \
+    Vitals/Core/CPUStats.cpp Vitals/Core/MemoryStats.cpp \
+    Vitals/Core/GPUStats.cpp Vitals/Core/ProcessStats.cpp Vitals/Core/ProcessNames.cpp \
+    -framework Foundation -framework IOKit -framework CoreFoundation \
+    -o "$check_dir/gpu-stats-tests"
+"$check_dir/gpu-stats-tests"
+
 xcrun swiftc -swift-version 5 -Onone -module-cache-path "$check_dir/swift-cache" \
     Tests/MetricHelpTests.swift Vitals/Models/MetricHelpTopic.swift \
     -o "$check_dir/metric-help-tests"

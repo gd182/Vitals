@@ -9,17 +9,27 @@
 #define GPUSTATS_HPP
 
 #include <cstdint>
+#include <expected>
 #include <IOKit/IOKitLib.h>
 
 namespace Vitals
 {
+    enum class GPUReadError : uint8_t
+    {
+        unavailable, ///< device or meter is missing
+        readFailed,  ///< data request failed
+        invalidData, ///< data of an incorrect type or range received
+    };
+
+    template<typename T> using GPUReading = std::expected<T, GPUReadError>;
+
     struct GPUInfo {
-        float utilization;
-        float renderUtilization;
-        float tilerUtilization;
-        float aneUtilization;
-        uint64_t vramUsed;
-        uint64_t vramTotal;
+        GPUReading<float> utilization = std::unexpected(GPUReadError::unavailable);
+        GPUReading<float> renderUtilization = std::unexpected(GPUReadError::unavailable);
+        GPUReading<float> tilerUtilization = std::unexpected(GPUReadError::unavailable);
+        GPUReading<float> aneUtilization = std::unexpected(GPUReadError::unavailable);
+        GPUReading<uint64_t> vramUsed = std::unexpected(GPUReadError::unavailable);
+        GPUReading<uint64_t> vramTotal = std::unexpected(GPUReadError::unavailable);
     };
 
 
@@ -31,7 +41,8 @@ namespace Vitals
         GPUInfo getUsage();
     private:
         io_service_t service = 0;
-        GPUInfo gpuInfo = {0, 0, 0, 0, 0};
+        GPUReadError serviceError = GPUReadError::unavailable;
+        GPUReading<uint64_t> unifiedMemoryTotal = std::unexpected(GPUReadError::unavailable);
     };
 };
 #endif //GPUSTATS_HPP

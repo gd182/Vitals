@@ -15,6 +15,7 @@ struct GeneralSettingsView: View {
 
     @State private var updateTask: Task<Void, Never>?
     private let appBuildInfo = AppBuildInfo()
+    private let updatePreferences = UpdatePreferences()
 
     var body: some View {
         Form {
@@ -98,6 +99,15 @@ struct GeneralSettingsView: View {
                 }
                 updateStatus
                     .font(.caption)
+                LabeledContent("updates_last_successful_check") {
+                    if let date = updatePreferences.lastSuccessfulCheck {
+                        Text(date, format: .dateTime.day().month().year().hour().minute())
+                            .foregroundStyle(.secondary)
+                    } else {
+                        Text("updates_no_successful_check")
+                            .foregroundStyle(.secondary)
+                    }
+                }
             }
             Section {
                 Button("setup_reopen") {

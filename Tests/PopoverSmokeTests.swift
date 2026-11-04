@@ -196,6 +196,19 @@ struct PopoverSmokeTests {
         NotificationCenter.default.post(name: UserDefaults.didChangeNotification, object: UserDefaults.standard)
     }
 
+    @MainActor static func scrollSettingsToBottom(_ window: NSWindow) {
+        guard let view = window.contentView,
+              let scroll = firstScrollView(in: view),
+              let document = scroll.documentView else {
+            preconditionFailure("Expected scrollable settings")
+        }
+        let y = document.isFlipped
+            ? max(document.bounds.minY, document.bounds.maxY - scroll.contentView.bounds.height)
+            : document.bounds.minY
+        scroll.contentView.scroll(to: NSPoint(x: 0, y: y))
+        scroll.reflectScrolledClipView(scroll.contentView)
+    }
+
     @MainActor static func snapshot(_ window: NSWindow, name: String) {
         guard let view = window.contentView,
               let bitmap = view.bitmapImageRepForCachingDisplay(in: view.bounds) else {
@@ -515,7 +528,53 @@ struct PopoverSmokeTests {
                 }
             }
         }
-        steps.append((0.1, { settingsWindow.close() }))
+        let knownSuccess = Date(timeIntervalSince1970: 1_700_000_000)
+        let failedChecker = UpdateChecker(currentVersion: "0.1.0", fetchReleases: {
+            throw URLError(.notConnectedToInternet)
+        })
+        for theme in ["light", "dark"] {
+            for language in ["en", "ru", "de"] {
+                for hasDate in [false, true] {
+                    steps.append((0.1, {
+                        overrideDefaults(["lastSuccessfulUpdateCheck": hasDate ? knownSuccess : "invalid" as Any])
+                        assert(UpdatePreferences().lastSuccessfulCheck == (hasDate ? knownSuccess : nil))
+                        settingsWindow.contentViewController = NSHostingController(rootView:
+                            SettingsView(initialSection: .general)
+                                .environmentObject(delegate.langManager)
+                                .environmentObject(delegate.updateChecker)
+                                .environment(\.locale, Locale(identifier: language))
+                                .preferredColorScheme(theme == "dark" ? .dark : .light)
+                        )
+                        settingsWindow.makeKeyAndOrderFront(nil)
+                    }))
+                    steps.append((0.3, {
+                        scrollSettingsToBottom(settingsWindow)
+                    }))
+                    steps.append((0.1, {
+                        snapshot(settingsWindow, name: "update-date-\(hasDate ? "saved" : "empty")-\(language)-\(theme)")
+                    }))
+                }
+            }
+        }
+        steps.append((0.1, {
+            settingsWindow.contentViewController = NSHostingController(rootView:
+                SettingsView(initialSection: .general)
+                    .environmentObject(delegate.langManager)
+                    .environmentObject(failedChecker)
+                    .environment(\.locale, Locale(identifier: "ru"))
+            )
+            Task { await failedChecker.checkForUpdates(includePrereleases: false) }
+        }))
+        steps.append((0.4, {
+            guard case .failed = failedChecker.state else { fatalError("Expected failed check") }
+            assert(UpdatePreferences().lastSuccessfulCheck == knownSuccess)
+            scrollSettingsToBottom(settingsWindow)
+        }))
+        steps.append((0.1, {
+            snapshot(settingsWindow, name: "update-date-preserved-after-failure")
+            print("Settings date and empty states rendered in RU/EN/DE and both themes; failure preserves success date")
+            settingsWindow.close()
+        }))
         for tab in [1, 2] {
             steps.append((0.1, {
                 settingsWindow.contentViewController = NSHostingController(rootView:

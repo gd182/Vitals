@@ -257,7 +257,7 @@ struct AutomaticUpdateTests {
         preferences.recordAttempt(at: lastAttempt)
         preferences.automaticChecksEnabled = true
         let expectedDate = lastAttempt.addingTimeInterval(
-            UpdateCheckPolicy.interval
+            UpdateCheckInterval.daily.timeInterval
         )
 
         scheduler.refresh(includePrereleases: false)
@@ -399,7 +399,7 @@ struct AutomaticUpdateTests {
 
         var now = Date().addingTimeInterval(3600)
         preferences.recordAttempt(at: now)
-        let firstDate = now.addingTimeInterval(UpdateCheckPolicy.interval)
+        let firstDate = now.addingTimeInterval(UpdateCheckInterval.daily.timeInterval)
 
         var requestCount = 0
         let checker = UpdateChecker(currentVersion: "0.1.0") {
@@ -440,7 +440,7 @@ struct AutomaticUpdateTests {
         timer.fire()
 
         let nextDate = await dates.next()
-        let expectedDate = now.addingTimeInterval(UpdateCheckPolicy.interval)
+        let expectedDate = now.addingTimeInterval(UpdateCheckInterval.daily.timeInterval)
         #expect(nextDate == expectedDate)
         #expect(scheduler.scheduledCheckDate == expectedDate)
         #expect(preferences.lastAttempt == now)

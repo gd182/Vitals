@@ -23,11 +23,10 @@ nonisolated enum UpdateCheckInterval: Int, CaseIterable, Identifiable {
 }
 
 nonisolated enum UpdateCheckPolicy {
-    static let interval: TimeInterval = 24 * 60 * 60
-
     static func shouldCheck(
         enabled: Bool,
         lastAttempt: Date?,
+        interval: UpdateCheckInterval = .daily,
         now: Date
     ) -> Bool {
         guard enabled else {
@@ -41,12 +40,13 @@ nonisolated enum UpdateCheckPolicy {
             return true
         }
 
-        return now.timeIntervalSince(lastAttempt) >= interval
+        return now.timeIntervalSince(lastAttempt) >= interval.timeInterval
     }
 
     static func nextCheckDate(
         enabled: Bool,
         lastAttempt: Date?,
+        interval: UpdateCheckInterval = .daily,
         now: Date
     ) -> Date? {
         guard enabled else {
@@ -56,6 +56,7 @@ nonisolated enum UpdateCheckPolicy {
         if shouldCheck(
             enabled: enabled,
             lastAttempt: lastAttempt,
+            interval: interval,
             now: now
         ) {
             return now
@@ -65,6 +66,6 @@ nonisolated enum UpdateCheckPolicy {
             return now
         }
 
-        return lastAttempt.addingTimeInterval(interval)
+        return lastAttempt.addingTimeInterval(interval.timeInterval)
     }
 }

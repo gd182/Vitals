@@ -7,6 +7,21 @@
 
 import Foundation
 
+nonisolated enum UpdateCheckInterval: Int, CaseIterable, Identifiable {
+    case sixHours = 21600
+    case twelveHours = 43200
+    case daily = 86400
+    case weekly = 604800
+
+    var id: Self {
+        self
+    }
+
+    var timeInterval: TimeInterval {
+        TimeInterval(rawValue)
+    }
+}
+
 nonisolated enum UpdateCheckPolicy {
     static let interval: TimeInterval = 24 * 60 * 60
 

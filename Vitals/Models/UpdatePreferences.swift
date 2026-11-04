@@ -10,6 +10,19 @@ import Foundation
 @MainActor
 final class UpdatePreferences {
     private let defaults: UserDefaults
+    var checkInterval: UpdateCheckInterval {
+        get {
+            guard let rawValue = defaults.object(forKey: "automaticUpdateCheckInterval") as? Int,
+                let interval = UpdateCheckInterval(rawValue: rawValue) else {
+                return .daily
+            }
+            return interval
+        }
+        set {
+            defaults.set(newValue.rawValue, forKey: "automaticUpdateCheckInterval")
+        }
+    }
+
     var lastSuccessfulCheck: Date? {
         defaults.object(forKey: "lastSuccessfulUpdateCheck") as? Date
     }

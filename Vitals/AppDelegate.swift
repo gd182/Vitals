@@ -43,7 +43,8 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate, NSWindowD
     private(set) var setupWindow: NSWindow?
     private var updatePreferencesSnapshot: (
         enabled: Bool,
-        prereleases: Bool
+        prereleases: Bool,
+        interval: UpdateCheckInterval
     )?
 
     override convenience init() {
@@ -356,16 +357,19 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate, NSWindowD
         let defaults = UserDefaults.standard
         let enabled = defaults.bool(forKey: "automaticUpdateChecks")
         let prereleases = defaults.bool(forKey: "includePrereleaseUpdates")
+        let interval = UpdatePreferences(defaults: defaults).checkInterval
 
         if let snapshot = updatePreferencesSnapshot,
         snapshot.enabled == enabled,
-        snapshot.prereleases == prereleases {
+        snapshot.prereleases == prereleases,
+        snapshot.interval == interval {
             return
         }
 
         updatePreferencesSnapshot = (
             enabled: enabled,
-            prereleases: prereleases
+            prereleases: prereleases,
+            interval: interval
         )
         refreshAutomaticUpdates()
     }

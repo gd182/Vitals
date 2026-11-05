@@ -66,6 +66,7 @@ final class AutomaticUpdateScheduler {
         guard UpdateCheckPolicy.shouldCheck(
             enabled: preferences.automaticChecksEnabled, 
             lastAttempt: preferences.lastAttempt, 
+            interval: preferences.checkInterval,
             now: now
         )else {
             return
@@ -122,6 +123,7 @@ final class AutomaticUpdateScheduler {
         guard let date = UpdateCheckPolicy.nextCheckDate(
             enabled: preferences.automaticChecksEnabled,
             lastAttempt: preferences.lastAttempt,
+            interval: preferences.checkInterval,
             now: now
         ) else {
             return

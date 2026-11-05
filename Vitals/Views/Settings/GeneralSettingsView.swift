@@ -9,6 +9,8 @@ struct GeneralSettingsView: View {
     @AppStorage("includePrereleaseUpdates") private var includePrereleaseUpdates = false
     @AppStorage("automaticUpdateChecks")
     private var automaticUpdateChecks = false
+    @AppStorage("automaticUpdateCheckInterval")
+    private var automaticCheckInterval: UpdateCheckInterval = .daily
     @EnvironmentObject var langManager: LanguageManager
     @StateObject private var loginItem = LoginItemSettings()
     @EnvironmentObject private var updateChecker: UpdateChecker
@@ -55,6 +57,17 @@ struct GeneralSettingsView: View {
                     Text(verbatim: appBuildInfo.build ?? "N/A")
                         .textSelection(.enabled)
                 }
+                Picker(
+                    "updates_check_interval",
+                    selection: $automaticCheckInterval
+                ) {
+                    ForEach(UpdateCheckInterval.allCases) { interval in
+                        Text(LocalizedStringKey(interval.titleKey))
+                            .tag(interval)
+                    }
+                }
+                .pickerStyle(.menu)
+                .disabled(!automaticUpdateChecks)
                 Toggle(
                     "updates_automatic_checks",
                     isOn: $automaticUpdateChecks
@@ -116,7 +129,10 @@ struct GeneralSettingsView: View {
             }
         }
         .formStyle(.grouped)
-        .onAppear { loginItem.refresh() }
+        .onAppear {
+            updatePreferences.checkInterval = updatePreferences.checkInterval
+            loginItem.refresh()
+        }
         .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in
             loginItem.refresh()
         }

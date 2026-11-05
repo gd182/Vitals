@@ -575,6 +575,62 @@ struct PopoverSmokeTests {
             print("Settings date and empty states rendered in RU/EN/DE and both themes; failure preserves success date")
             settingsWindow.close()
         }))
+        for theme in ["light", "dark"] {
+            for language in ["en", "ru", "de"] {
+                for interval in UpdateCheckInterval.allCases {
+                    steps.append((0.1, {
+                        overrideDefaults(["automaticUpdateChecks": true,
+                                          "lastAutomaticUpdateAttempt": Date(),
+                                          "automaticUpdateCheckInterval": interval.rawValue])
+                        settingsWindow.contentViewController = NSHostingController(rootView:
+                            SettingsView(initialSection: .general)
+                                .environmentObject(delegate.langManager)
+                                .environmentObject(delegate.updateChecker)
+                                .environment(\.locale, Locale(identifier: language))
+                                .preferredColorScheme(theme == "dark" ? .dark : .light)
+                        )
+                        settingsWindow.makeKeyAndOrderFront(nil)
+                    }))
+                    steps.append((0.3, { scrollSettingsToBottom(settingsWindow) }))
+                    steps.append((0.1, {
+                        assert(UpdatePreferences().checkInterval == interval)
+                        assert(!delegate.updateChecker.isChecking)
+                        snapshot(settingsWindow, name: "update-interval-\(interval.rawValue)-\(language)-\(theme)")
+                    }))
+                }
+            }
+        }
+        for raw in [21600.5, 3.5] {
+            steps.append((0.1, {
+                overrideDefaults(["automaticUpdateChecks": false])
+                // Launch arguments override persistent values, so corrupt the isolated app domain instead.
+                var arguments = UserDefaults.standard.volatileDomain(forName: UserDefaults.argumentDomain)
+                arguments.removeValue(forKey: "automaticUpdateCheckInterval")
+                UserDefaults.standard.setVolatileDomain(arguments, forName: UserDefaults.argumentDomain)
+                UserDefaults.standard.set(raw, forKey: "automaticUpdateCheckInterval")
+                settingsWindow.contentViewController = NSHostingController(rootView:
+                    SettingsView(initialSection: .general)
+                        .environmentObject(delegate.langManager)
+                        .environmentObject(delegate.updateChecker)
+                        .environment(\.locale, Locale(identifier: "ru"))
+                )
+                settingsWindow.makeKeyAndOrderFront(nil)
+            }))
+            steps.append((0.3, {
+                assert(UpdatePreferences().checkInterval == .daily)
+                assert(!UpdatePreferences().automaticChecksEnabled)
+                assert(UserDefaults.standard.object(forKey: "automaticUpdateCheckInterval") as? Int == 86400)
+                scrollSettingsToBottom(settingsWindow)
+            }))
+            steps.append((0.1, {
+                snapshot(settingsWindow, name: "update-interval-normalized-\(raw)")
+            }))
+        }
+        steps.append((0.1, {
+            overrideDefaults(["automaticUpdateChecks": false, "automaticUpdateCheckInterval": 86400])
+            settingsWindow.close()
+            print("Daily/weekly/monthly settings rendered in RU/EN/DE; invalid values normalized without enabling checks")
+        }))
         for tab in [1, 2] {
             steps.append((0.1, {
                 settingsWindow.contentViewController = NSHostingController(rootView:

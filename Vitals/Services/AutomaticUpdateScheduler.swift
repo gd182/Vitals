@@ -75,7 +75,8 @@ final class AutomaticUpdateScheduler {
         preferences.recordAttempt(at: now)
 
         await checker.checkForUpdates(
-            includePrereleases: includePrereleases
+            includePrereleases: includePrereleases,
+            mode: .automatic
         )
     }
 

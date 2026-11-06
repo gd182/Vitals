@@ -23,4 +23,7 @@ struct CPUView: View {
 
 #Preview {
     CPUView().environmentObject(SystemViewModel())
+    .environmentObject(
+        UpdateChecker(currentVersion: "0.0.1", fetchReleases: { [] })
+    )
 }

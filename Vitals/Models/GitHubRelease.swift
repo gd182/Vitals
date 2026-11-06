@@ -7,7 +7,7 @@
 
 import Foundation
 
-nonisolated struct GitHubRelease: Decodable, Sendable {
+nonisolated struct GitHubRelease: Codable, Sendable {
     let tagName: String
     let name: String?
     let htmlUrl: URL

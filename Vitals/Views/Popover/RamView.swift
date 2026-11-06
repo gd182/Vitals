@@ -30,4 +30,7 @@ struct RAMView: View {
 
 #Preview {
     RAMView().environmentObject(SystemViewModel())
+    .environmentObject(
+        UpdateChecker(currentVersion: "0.0.1", fetchReleases: { [] })
+    )
 }

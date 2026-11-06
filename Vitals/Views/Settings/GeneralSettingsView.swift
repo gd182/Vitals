@@ -112,6 +112,18 @@ struct GeneralSettingsView: View {
                 }
                 updateStatus
                     .font(.caption)
+                if updateChecker.availableRelease != nil {
+                    Button("updates_release_notes") {
+                        NotificationCenter.default.post(
+                            name: .init("VitalsShowReleaseNotes"),
+                            object: nil
+                        )
+                    }
+                    Button("updates_skip_version") {
+                        updateChecker.skipAvailableRelease()
+                    }
+                    .disabled(updateChecker.isChecking)
+                }
                 LabeledContent("updates_last_successful_check") {
                     if let date = updatePreferences.lastSuccessfulCheck {
                         Text(date, format: .dateTime.day().month().year().hour().minute())

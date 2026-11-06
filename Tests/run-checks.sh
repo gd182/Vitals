@@ -123,10 +123,16 @@ if [[ "${1:-}" == "--ui" ]]; then
     for name in SystemMonitor CPUStats MemoryStats GPUStats ProcessStats ProcessNames; do
         native_objects+=("$object_dir/$name.o")
     done
+    package_products="$check_dir/build/Build/Products/Release"
+    package_objects=()
+    for name in MarkdownUI NetworkImage cmark-gfm cmark-gfm-extensions; do
+        package_objects+=("$package_products/$name.o")
+    done
     xcrun swiftc -swift-version 5 -Onone -target "$machine_arch-apple-macos14.6" \
         -default-isolation MainActor -module-cache-path "$check_dir/swift-cache" \
+        -I "$package_products" \
         -import-objc-header Vitals/Bridge/SystemMonitor.h \
-        Tests/PopoverSmokeTests.swift "${swift_sources[@]}" "${native_objects[@]}" \
+        Tests/PopoverSmokeTests.swift "${swift_sources[@]}" "${native_objects[@]}" "${package_objects[@]}" \
         -Xlinker -lc++ -framework IOKit -framework CoreFoundation \
         -o "$check_dir/Smoke.app/Contents/MacOS/Vitals"
     "$check_dir/Smoke.app/Contents/MacOS/Vitals" -updateInterval 0.5 -backgroundUpdateInterval 3 -hasCompletedSetup NO -menuBarCPU YES -menuBarRAM YES -menuBarGPU YES

@@ -22,6 +22,32 @@ final class UpdatePreferences {
             defaults.set(newValue.rawValue, forKey: "automaticUpdateCheckInterval")
         }
     }
+    var cachedRelease: GitHubRelease? {
+        get {
+            guard let data = defaults.data(forKey: "cachedUpdateRelease") else {
+                return nil
+            }
+
+            do {
+                return try JSONDecoder().decode(GitHubRelease.self, from: data)
+            } catch {
+                defaults.removeObject(forKey: "cachedUpdateRelease")
+                return nil
+            }
+        }
+        set {
+            guard let newValue else {
+                defaults.removeObject(forKey: "cachedUpdateRelease")
+                return
+            }
+
+            guard let data = try? JSONEncoder().encode(newValue) else {
+                return
+            }
+
+            defaults.set(data, forKey: "cachedUpdateRelease")
+        }
+    }
 
     var lastSuccessfulCheck: Date? {
         defaults.object(forKey: "lastSuccessfulUpdateCheck") as? Date
@@ -42,6 +68,19 @@ final class UpdatePreferences {
 
     var lastAttempt: Date? {
         defaults.object(forKey: "lastAutomaticUpdateAttempt") as? Date
+    }
+
+    var skippedVersion: String? {
+        get {
+            defaults.string(forKey: "skippedUpdateVersion")
+        }
+        set {
+            if let newValue {
+                defaults.set(newValue, forKey: "skippedUpdateVersion")
+            } else {
+                defaults.removeObject(forKey: "skippedUpdateVersion")
+            }
+        }
     }
 
     func recordAttempt(at date: Date) {

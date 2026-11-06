@@ -22,14 +22,29 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate, NSWindowD
     private var subscriptions: [MenuBarModule: AnyCancellable] = [:]
 
     var langManager = LanguageManager()
-    let updateChecker = UpdateChecker(
-        currentVersion: Bundle.main.object(
-            forInfoDictionaryKey: "CFBundleShortVersionString"
-        ) as? String,
-        fetchReleases: {
-            try await GitHubReleaseService().fetchReleases()
-        }
-    )
+    let updateChecker: UpdateChecker = {
+        let preferences = UpdatePreferences()
+
+        return UpdateChecker(
+            currentVersion: Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String,
+            recordSuccessfulCheck: preferences.recordSuccessfulCheck,
+            fetchReleases: {
+                try await GitHubReleaseService().fetchReleases()
+            },
+            cachedRelease: preferences.cachedRelease,
+            includePrereleases: UserDefaults.standard.bool(
+                forKey: "includePrereleaseUpdates"
+            ),
+            recordAvailableRelease: { release in
+                preferences.cachedRelease = release
+            },
+            skippedVersion: preferences.skippedVersion,
+            recordSkippedVersion: { version in
+                preferences.skippedVersion = version
+            }
+        )
+    }()
+
     private lazy var automaticUpdateScheduler = AutomaticUpdateScheduler(
         checker: updateChecker,
         preferences: UpdatePreferences()
@@ -40,9 +55,11 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate, NSWindowD
     private var lifecycleObservers = Set<AnyCancellable>()
     private let workspaceNotificationCenter: NotificationCenter
     private(set) var setupWindow: NSWindow?
+    private(set) var releaseNotesWindow: NSWindow?
     private var updatePreferencesSnapshot: (
         enabled: Bool,
-        prereleases: Bool
+        prereleases: Bool,
+        interval: UpdateCheckInterval
     )?
 
     override convenience init() {
@@ -104,6 +121,12 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate, NSWindowD
                 }
             }
             .store(in: &lifecycleObservers)
+            NotificationCenter.default.publisher(for: .init("VitalsShowReleaseNotes"))
+                .receive(on: RunLoop.main)
+                .sink { [weak self] _ in
+                    self?.showReleaseNotes()
+                }
+                .store(in: &lifecycleObservers)
         if !UserDefaults.standard.bool(forKey: "hasCompletedSetup") {
             showSetup()
         }
@@ -165,8 +188,9 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate, NSWindowD
     }
 
     func windowWillClose(_ notification: Notification) {
-        guard let window = notification.object as? NSWindow, window === setupWindow else { return }
-        setupWindow = nil
+        guard let window = notification.object as? NSWindow else { return }
+        if window === setupWindow { setupWindow = nil }
+        if window === releaseNotesWindow { releaseNotesWindow = nil }
     }
 
     private func updateMenuBar() {
@@ -243,6 +267,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate, NSWindowD
                     })
                         .environmentObject(self.vm)
                         .environmentObject(self.langManager)
+                        .environmentObject(self.updateChecker)
                 }
             )
             // The resize animator is the only owner of CPU/RAM popover size updates.
@@ -272,6 +297,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate, NSWindowD
                     })
                         .environmentObject(self.vm)
                         .environmentObject(self.langManager)
+                        .environmentObject(self.updateChecker)
                 }
             )
             controller.sizingOptions = []
@@ -300,6 +326,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate, NSWindowD
                     })
                         .environmentObject(self.vm)
                         .environmentObject(self.langManager)
+                        .environmentObject(self.updateChecker)
                 }
             )
             controller.sizingOptions = [.preferredContentSize]
@@ -355,17 +382,60 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate, NSWindowD
         let defaults = UserDefaults.standard
         let enabled = defaults.bool(forKey: "automaticUpdateChecks")
         let prereleases = defaults.bool(forKey: "includePrereleaseUpdates")
+        let interval = UpdatePreferences(defaults: defaults).checkInterval
 
         if let snapshot = updatePreferencesSnapshot,
         snapshot.enabled == enabled,
-        snapshot.prereleases == prereleases {
+        snapshot.prereleases == prereleases,
+        snapshot.interval == interval {
             return
         }
 
         updatePreferencesSnapshot = (
             enabled: enabled,
-            prereleases: prereleases
+            prereleases: prereleases,
+            interval: interval
         )
         refreshAutomaticUpdates()
+    }
+
+    private func showReleaseNotes() {
+        if let window = releaseNotesWindow {
+            NSApp.activate(ignoringOtherApps: true)
+            window.makeKeyAndOrderFront(nil)
+            return
+        }
+
+        guard let release = updateChecker.availableRelease else {
+            return
+        }
+
+        closePopovers()
+
+        let window = NSWindow(
+            contentRect: NSRect(x: 0, y: 0, width: 520, height: 420),
+            styleMask: [.titled, .closable, .resizable],
+            backing: .buffered,
+            defer: false
+        )
+
+        window.contentMinSize = NSSize(width: 440, height: 300)
+        window.isReleasedWhenClosed = false
+        window.delegate = self
+        window.title = "Vitals"
+
+        window.contentViewController = NSHostingController(
+            rootView: LocalizedRoot(langManager: langManager) { [weak self] in
+                ReleaseNotesView(release: release) { [weak self] in
+                    self?.releaseNotesWindow?.close()
+                }
+            }
+        )
+
+        releaseNotesWindow = window
+
+        window.center()
+        NSApp.activate(ignoringOtherApps: true)
+        window.makeKeyAndOrderFront(nil)
     }
 }

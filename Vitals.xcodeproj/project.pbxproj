@@ -17,6 +17,7 @@
 		AA1000000000000000000017 /* SystemViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA1000000000000000000027; };
 		AA1000000000000000000018 /* MonitorWorker.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA1000000000000000000028; };
 		0E51DE79303DAC6900C0DB78 /* Localizable.xcstrings in Resources */ = {isa = PBXBuildFile; fileRef = 0E51DE78303DAC6900C0DB78 /* Localizable.xcstrings */; };
+		0E209E10309CBE5700D57CF7 /* MarkdownUI in Frameworks */ = {isa = PBXBuildFile; productRef = 0E209E0F309CBE5700D57CF7 /* MarkdownUI */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -82,6 +83,7 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				0E209E10309CBE5700D57CF7 /* MarkdownUI in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -122,7 +124,15 @@
 				0E51DE78303DAC6900C0DB78 /* Localizable.xcstrings */,
 				0EE8BC3230842EE600FC73FD /* VitalsTests.xctest */,
 				0EE8BC3330842EE600FC73FD /* VitalsTests */,
+				0E209E0E309CBE5700D57CF7 /* Frameworks */,
 			);
+			sourceTree = "<group>";
+		};
+		0E209E0E309CBE5700D57CF7 /* Frameworks */ = {
+			isa = PBXGroup;
+			children = (
+			);
+			name = Frameworks;
 			sourceTree = "<group>";
 		};
 /* End PBXGroup section */
@@ -159,6 +169,7 @@
 			);
 			name = Vitals;
 			packageProductDependencies = (
+				0E209E0F309CBE5700D57CF7 /* MarkdownUI */,
 			);
 			productName = Vitals;
 			productReference = 0EDFD9CA2FE047CE002062D0 /* Vitals.app */;
@@ -216,6 +227,9 @@
 			);
 			mainGroup = 0EDFD99F2FE03AC1002062D0;
 			minimizedProjectReferenceProxies = 1;
+			packageReferences = (
+				0E209E0D309CBCD300D57CF7 /* XCRemoteSwiftPackageReference "swift-markdown-ui" */,
+			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = 0EDFD99F2FE03AC1002062D0;
 			projectDirPath = "";
@@ -576,6 +590,25 @@
 			defaultConfigurationName = Release;
 		};
 /* End XCConfigurationList section */
+
+/* Begin XCRemoteSwiftPackageReference section */
+		0E209E0D309CBCD300D57CF7 /* XCRemoteSwiftPackageReference "swift-markdown-ui" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/gonzalezreal/swift-markdown-ui";
+			requirement = {
+				kind = exactVersion;
+				version = 2.4.1;
+			};
+		};
+/* End XCRemoteSwiftPackageReference section */
+
+/* Begin XCSwiftPackageProductDependency section */
+		0E209E0F309CBE5700D57CF7 /* MarkdownUI */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 0E209E0D309CBCD300D57CF7 /* XCRemoteSwiftPackageReference "swift-markdown-ui" */;
+			productName = MarkdownUI;
+		};
+/* End XCSwiftPackageProductDependency section */
 	};
 	rootObject = 0EDFD9A02FE03AC1002062D0 /* Project object */;
 }

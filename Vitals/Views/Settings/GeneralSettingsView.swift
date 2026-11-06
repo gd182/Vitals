@@ -9,12 +9,15 @@ struct GeneralSettingsView: View {
     @AppStorage("includePrereleaseUpdates") private var includePrereleaseUpdates = false
     @AppStorage("automaticUpdateChecks")
     private var automaticUpdateChecks = false
+    @AppStorage("automaticUpdateCheckInterval")
+    private var automaticCheckInterval: UpdateCheckInterval = .daily
     @EnvironmentObject var langManager: LanguageManager
     @StateObject private var loginItem = LoginItemSettings()
     @EnvironmentObject private var updateChecker: UpdateChecker
 
     @State private var updateTask: Task<Void, Never>?
     private let appBuildInfo = AppBuildInfo()
+    private let updatePreferences = UpdatePreferences()
 
     var body: some View {
         Form {
@@ -54,6 +57,17 @@ struct GeneralSettingsView: View {
                     Text(verbatim: appBuildInfo.build ?? "N/A")
                         .textSelection(.enabled)
                 }
+                Picker(
+                    "updates_check_interval",
+                    selection: $automaticCheckInterval
+                ) {
+                    ForEach(UpdateCheckInterval.allCases) { interval in
+                        Text(LocalizedStringKey(interval.titleKey))
+                            .tag(interval)
+                    }
+                }
+                .pickerStyle(.menu)
+                .disabled(!automaticUpdateChecks)
                 Toggle(
                     "updates_automatic_checks",
                     isOn: $automaticUpdateChecks
@@ -98,6 +112,27 @@ struct GeneralSettingsView: View {
                 }
                 updateStatus
                     .font(.caption)
+                if updateChecker.availableRelease != nil {
+                    Button("updates_release_notes") {
+                        NotificationCenter.default.post(
+                            name: .init("VitalsShowReleaseNotes"),
+                            object: nil
+                        )
+                    }
+                    Button("updates_skip_version") {
+                        updateChecker.skipAvailableRelease()
+                    }
+                    .disabled(updateChecker.isChecking)
+                }
+                LabeledContent("updates_last_successful_check") {
+                    if let date = updatePreferences.lastSuccessfulCheck {
+                        Text(date, format: .dateTime.day().month().year().hour().minute())
+                            .foregroundStyle(.secondary)
+                    } else {
+                        Text("updates_no_successful_check")
+                            .foregroundStyle(.secondary)
+                    }
+                }
             }
             Section {
                 Button("setup_reopen") {
@@ -106,7 +141,10 @@ struct GeneralSettingsView: View {
             }
         }
         .formStyle(.grouped)
-        .onAppear { loginItem.refresh() }
+        .onAppear {
+            updatePreferences.checkInterval = updatePreferences.checkInterval
+            loginItem.refresh()
+        }
         .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in
             loginItem.refresh()
         }

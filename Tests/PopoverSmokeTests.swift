@@ -1,6 +1,26 @@
 import AppKit
 import SwiftUI
 
+// Keep window integration checks independent of the network and published releases.
+final class ReleaseNotesURLProtocol: URLProtocol, @unchecked Sendable {
+    override class func canInit(with request: URLRequest) -> Bool {
+        request.url?.host == "api.github.com"
+    }
+
+    override class func canonicalRequest(for request: URLRequest) -> URLRequest { request }
+
+    override func startLoading() {
+        let response = HTTPURLResponse(url: request.url!, statusCode: 200,
+                                       httpVersion: nil, headerFields: nil)!
+        let data = Data(#"[{"tag_name":"999.0.0","name":"UI fixture","html_url":"https://github.com/gd182/Vitals/releases/tag/999.0.0","body":"Release notes integration fixture","prerelease":false,"draft":false}]"#.utf8)
+        client?.urlProtocol(self, didReceive: response, cacheStoragePolicy: .notAllowed)
+        client?.urlProtocol(self, didLoad: data)
+        client?.urlProtocolDidFinishLoading(self)
+    }
+
+    override func stopLoading() {}
+}
+
 @MainActor
 final class ProcessResizeProbe: ObservableObject {
     @Published var state = ProcessListState.loading
@@ -26,6 +46,262 @@ struct ProcessResizeProbeView: View {
 
 @main
 struct PopoverSmokeTests {
+    @MainActor static func releaseNotesWindowSteps(for delegate: AppDelegate) -> [(Double, @MainActor () -> Void)] {
+        var firstWindow: NSWindow?
+        var checkFinished = false
+        var task: Task<Void, Never>?
+        func openNotes() {
+            NotificationCenter.default.post(name: .init("VitalsShowReleaseNotes"), object: nil)
+        }
+        var steps: [(Double, @MainActor () -> Void)] = [
+            (0.1, {
+                delegate.updateChecker.reset()
+                openNotes()
+            }),
+            (0.2, {
+                assert(delegate.releaseNotesWindow == nil, "No release must mean no notes window")
+                task = Task {
+                    await delegate.updateChecker.checkForUpdates(includePrereleases: false)
+                    checkFinished = true
+                }
+            }),
+            (1.0, {
+                assert(checkFinished && delegate.updateChecker.availableRelease?.tagName == "999.0.0",
+                       "The isolated release fixture must load before opening notes")
+                openNotes()
+            }),
+            (0.3, {
+                let window = delegate.releaseNotesWindow!
+                assert(window.isVisible && window.styleMask.contains(.resizable))
+                assert(window.contentMinSize == NSSize(width: 440, height: 300))
+                firstWindow = window
+                openNotes()
+            }),
+            (0.2, {
+                assert(delegate.releaseNotesWindow === firstWindow, "Repeated opening must reuse the window")
+                delegate.showSetup()
+                delegate.setupWindow?.close()
+                assert(delegate.setupWindow == nil && delegate.releaseNotesWindow === firstWindow,
+                       "Closing setup must not clear the release notes window")
+                let window = firstWindow!
+                window.makeKeyAndOrderFront(nil)
+                let escape = NSEvent.keyEvent(with: .keyDown, location: .zero, modifierFlags: [],
+                    timestamp: ProcessInfo.processInfo.systemUptime, windowNumber: window.windowNumber,
+                    context: nil, characters: "\u{1b}", charactersIgnoringModifiers: "\u{1b}",
+                    isARepeat: false, keyCode: 53)!
+                if !window.performKeyEquivalent(with: escape) { NSApp.sendEvent(escape) }
+            }),
+            (0.2, {
+                assert(delegate.releaseNotesWindow == nil && firstWindow?.isVisible == false,
+                       "Escape must close the window and clear its stored reference")
+                assert(delegate.updateChecker.availableRelease?.tagName == "999.0.0",
+                       "Closing notes must preserve the known update")
+                openNotes()
+            }),
+            (0.2, {
+                let window = delegate.releaseNotesWindow!
+                assert(window !== firstWindow && window.isVisible, "Closed notes must reopen in a new window")
+                window.performClose(nil)
+                assert(delegate.releaseNotesWindow == nil)
+                assert(delegate.updateChecker.availableRelease?.tagName == "999.0.0")
+                firstWindow = nil
+                task?.cancel()
+                let restored = AppDelegate(workspaceNotificationCenter: NotificationCenter())
+                assert(restored.updateChecker.availableRelease?.tagName == "999.0.0",
+                       "A fresh app delegate must restore the candidate from persistent preferences")
+                assert(restored.updateChecker.availableRelease?.body == "Release notes integration fixture")
+                guard case .idle = restored.updateChecker.state else {
+                    preconditionFailure("Restoring a cached release must not report a fresh check")
+                }
+                print("Release notes notification, reuse, Escape, native close and reopen integration checks passed")
+            })
+        ]
+        let panels: [(String, NSPopover, @MainActor () -> Void)] = [
+            ("cpu", delegate.popoverCPU, { delegate.toggleCPUPopover() }),
+            ("ram", delegate.popoverRAM, { delegate.toggleRAMPopover() }),
+            ("gpu", delegate.popoverGPU, { delegate.toggleGPUPopover() })
+        ]
+        for (name, popover, toggle) in panels {
+            steps.append((0.1, {
+                overrideDefaults(["panelCompact": true, "panelWidth": 360.0])
+                popover.animates = false
+                popover.behavior = .applicationDefined
+                toggle()
+            }))
+            steps.append((0.4, {
+                assert(popover.isShown)
+                let view = popover.contentViewController!.view
+                snapshot(view.window!, name: "update-badge-\(name)")
+                // Compact header: update, customize and settings controls, followed by 12pt padding.
+                let y = view.isFlipped ? view.bounds.minY + 18 : view.bounds.maxY - 18
+                click(NSPoint(x: view.bounds.maxX - 58, y: y), in: view)
+            }))
+            steps.append((0.3, {
+                assert(delegate.releaseNotesWindow?.isVisible == true,
+                       "The \(name) update button must open release notes")
+                assert(!popover.isShown, "Opening release notes must close the metric panel")
+                delegate.releaseNotesWindow?.close()
+                assert(delegate.updateChecker.availableRelease?.tagName == "999.0.0")
+                toggle()
+            }))
+            steps.append((0.3, {
+                let view = popover.contentViewController!.view
+                let y = view.isFlipped ? view.bounds.minY + 18 : view.bounds.maxY - 18
+                click(NSPoint(x: view.bounds.maxX - 58, y: y), in: view)
+            }))
+            steps.append((0.3, {
+                assert(delegate.releaseNotesWindow?.isVisible == true,
+                       "The indicator must still open notes after closing and reopening the panel")
+                delegate.releaseNotesWindow?.close()
+                delegate.updateChecker.reset()
+                toggle()
+            }))
+            steps.append((0.3, {
+                let view = popover.contentViewController!.view
+                snapshot(view.window!, name: "update-badge-cleared-\(name)")
+                let y = view.isFlipped ? view.bounds.minY + 18 : view.bounds.maxY - 18
+                click(NSPoint(x: view.bounds.maxX - 58, y: y), in: view)
+            }))
+            steps.append((0.2, {
+                assert(delegate.releaseNotesWindow == nil, "Cleared updates must not open release notes")
+                popover.close()
+                task = Task { await delegate.updateChecker.checkForUpdates(includePrereleases: false) }
+            }))
+        }
+        steps.append((0.3, {
+            task?.cancel()
+            print("CPU/RAM/GPU update indicators open release notes, survive closing and hide after reset")
+        }))
+        let settings = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 720, height: 480),
+                                styleMask: [.titled], backing: .buffered, defer: false)
+        settings.isReleasedWhenClosed = false
+        steps.append((0.1, {
+            settings.contentViewController = NSHostingController(rootView:
+                SettingsView(initialSection: .general)
+                    .environmentObject(delegate.langManager)
+                    .environmentObject(delegate.updateChecker)
+            )
+            settings.center()
+            settings.makeKeyAndOrderFront(nil)
+        }))
+        steps.append((0.3, { scrollSettingsToBottom(settings) }))
+        steps.append((0.2, {
+            snapshot(settings, name: "settings-skip-version")
+            // Fixed 720x480 fixture, scrolled to the bottom: the skip row precedes the success date.
+            let view = settings.contentView!
+            let y = view.isFlipped ? view.bounds.minY + 347 : view.bounds.maxY - 347
+            click(NSPoint(x: 300, y: y), in: view)
+        }))
+        steps.append((0.3, {
+            assert(delegate.updateChecker.availableRelease == nil)
+            assert(UpdatePreferences().skippedVersion == "999.0.0")
+            assert(UpdatePreferences().cachedRelease?.body == "Release notes integration fixture")
+            let restored = AppDelegate(workspaceNotificationCenter: NotificationCenter())
+            assert(restored.updateChecker.availableRelease == nil,
+                   "A fresh delegate must hide the persistently skipped release")
+            task = Task {
+                await delegate.updateChecker.checkForUpdates(includePrereleases: false, mode: .automatic)
+                assert(delegate.updateChecker.availableRelease == nil)
+                await delegate.updateChecker.checkForUpdates(includePrereleases: false, mode: .manual)
+            }
+        }))
+        steps.append((0.5, {
+            assert(delegate.updateChecker.availableRelease?.tagName == "999.0.0")
+            assert(UpdatePreferences().skippedVersion == "999.0.0")
+            settings.close()
+            // Leave the isolated smoke app ready for another test run.
+            UpdatePreferences().skippedVersion = nil
+            print("Settings skip button, persistent restore, automatic suppression and manual rediscovery passed")
+        }))
+        return steps
+    }
+
+    @MainActor static func releaseNotesSteps() -> [(Double, @MainActor () -> Void)] {
+        let window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 440, height: 300),
+                              styleMask: [.titled, .closable, .resizable], backing: .buffered, defer: false)
+        window.isReleasedWhenClosed = false
+        var steps: [(Double, @MainActor () -> Void)] = []
+        let longNotes = """
+        ## What's new
+
+        **Improved monitoring** with *clearer preferences* and `inline code`.
+
+        [Release page](https://github.com/gd182/Vitals/releases)
+
+        1. Open settings.
+        2. Check for updates.
+
+        ```swift
+        let version = "0.2.0"
+        ```
+
+        ### Changes
+
+        """ + (1...100).map { "- Change \($0): improved monitoring and update preferences." }
+            .joined(separator: "\n")
+        let scenarios: [(String, String?)] = [
+            ("missing", nil), ("empty", ""), ("whitespace", " \n\t "), ("long", longNotes)
+        ]
+        var closes = 0
+        for language in ["en", "ru", "de"] {
+            for theme in ["light", "dark"] {
+                for (name, notes) in scenarios {
+                    var beforeClose = 0
+                    steps.append((0.05, {
+                        beforeClose = closes
+                        let release = GitHubRelease(tagName: "0.2.0", name: "Vitals 0.2.0",
+                            htmlUrl: URL(string: "https://github.com/gd182/Vitals/releases/tag/0.2.0")!,
+                            body: notes, isPrerelease: false, isDraft: false)
+                        window.contentViewController = NSHostingController(rootView:
+                            ReleaseNotesView(release: release, onClose: { closes += 1 })
+                                .environment(\.locale, Locale(identifier: language))
+                                .preferredColorScheme(theme == "dark" ? .dark : .light)
+                        )
+                        window.setContentSize(NSSize(width: 440, height: 300))
+                        window.center()
+                        window.makeKeyAndOrderFront(nil)
+                    }))
+                    steps.append((0.2, {
+                        let view = window.contentView!
+                        view.layoutSubtreeIfNeeded()
+                        assert(abs(view.bounds.width - 440) < 1 && abs(view.bounds.height - 300) < 1,
+                               "Release notes must fit the minimum window size")
+                        let scroll = firstScrollView(in: view)!
+                        assert(scroll.bounds.height > 0 && scroll.bounds.width > 0,
+                               "The description viewport must remain visible")
+                        let document = scroll.documentView!
+                        if name == "long" {
+                            assert(document.bounds.height > scroll.contentView.bounds.height * 2,
+                                   "Long notes must scroll instead of expanding the window")
+                            scrollSettingsToBottom(window)
+                            assert(scroll.contentView.bounds.origin.y > 0,
+                                   "The final changes must be reachable by scrolling")
+                        }
+                    }))
+                    steps.append((0.1, {
+                        window.displayIfNeeded()
+                        if name == "long" || name == "missing" {
+                            snapshot(window, name: "release-notes-\(name)-\(language)-\(theme)")
+                        }
+                        let escape = NSEvent.keyEvent(with: .keyDown, location: .zero, modifierFlags: [],
+                            timestamp: ProcessInfo.processInfo.systemUptime, windowNumber: window.windowNumber,
+                            context: nil, characters: "\u{1b}", charactersIgnoringModifiers: "\u{1b}",
+                            isARepeat: false, keyCode: 53)!
+                        if !window.performKeyEquivalent(with: escape) { NSApp.sendEvent(escape) }
+                    }))
+                    steps.append((0.05, {
+                        assert(closes == beforeClose + 1, "Escape must invoke onClose exactly once")
+                    }))
+                }
+            }
+        }
+        steps.append((0.05, {
+            window.close()
+            print("Release notes minimum size, long scrolling, empty content and Escape checks passed in RU/EN/DE and both themes")
+        }))
+        return steps
+    }
+
     @MainActor static func checkGPUStatusGeometry() {
         for language in ["en", "ru", "de"] {
             for state in [ObjCGPUReadState.unavailable, .readFailed, .invalidData] {
@@ -196,6 +472,19 @@ struct PopoverSmokeTests {
         NotificationCenter.default.post(name: UserDefaults.didChangeNotification, object: UserDefaults.standard)
     }
 
+    @MainActor static func scrollSettingsToBottom(_ window: NSWindow) {
+        guard let view = window.contentView,
+              let scroll = firstScrollView(in: view),
+              let document = scroll.documentView else {
+            preconditionFailure("Expected scrollable settings")
+        }
+        let y = document.isFlipped
+            ? max(document.bounds.minY, document.bounds.maxY - scroll.contentView.bounds.height)
+            : document.bounds.minY
+        scroll.contentView.scroll(to: NSPoint(x: 0, y: y))
+        scroll.reflectScrolledClipView(scroll.contentView)
+    }
+
     @MainActor static func snapshot(_ window: NSWindow, name: String) {
         guard let view = window.contentView,
               let bitmap = view.bitmapImageRepForCachingDisplay(in: view.bounds) else {
@@ -222,6 +511,20 @@ struct PopoverSmokeTests {
 
     @MainActor static func main() {
         let app = NSApplication.shared
+        if CommandLine.arguments.contains("--release-notes-only") {
+            schedule(releaseNotesSteps())
+            app.run()
+            return
+        }
+        URLProtocol.registerClass(ReleaseNotesURLProtocol.self)
+        if CommandLine.arguments.contains("--release-notes-window-only") {
+            overrideDefaults(["automaticUpdateChecks": false, "hasCompletedSetup": true])
+            let delegate = AppDelegate(workspaceNotificationCenter: NotificationCenter())
+            delegate.applicationDidFinishLaunching(Notification(name: NSApplication.didFinishLaunchingNotification, object: app))
+            schedule(releaseNotesWindowSteps(for: delegate))
+            app.run()
+            return
+        }
         checkProcessListGeometry()
         checkMetricHelpGeometry()
         checkGPUStatusGeometry()
@@ -515,7 +818,109 @@ struct PopoverSmokeTests {
                 }
             }
         }
-        steps.append((0.1, { settingsWindow.close() }))
+        let knownSuccess = Date(timeIntervalSince1970: 1_700_000_000)
+        let failedChecker = UpdateChecker(currentVersion: "0.1.0", fetchReleases: {
+            throw URLError(.notConnectedToInternet)
+        })
+        for theme in ["light", "dark"] {
+            for language in ["en", "ru", "de"] {
+                for hasDate in [false, true] {
+                    steps.append((0.1, {
+                        overrideDefaults(["lastSuccessfulUpdateCheck": hasDate ? knownSuccess : "invalid" as Any])
+                        assert(UpdatePreferences().lastSuccessfulCheck == (hasDate ? knownSuccess : nil))
+                        settingsWindow.contentViewController = NSHostingController(rootView:
+                            SettingsView(initialSection: .general)
+                                .environmentObject(delegate.langManager)
+                                .environmentObject(delegate.updateChecker)
+                                .environment(\.locale, Locale(identifier: language))
+                                .preferredColorScheme(theme == "dark" ? .dark : .light)
+                        )
+                        settingsWindow.makeKeyAndOrderFront(nil)
+                    }))
+                    steps.append((0.3, {
+                        scrollSettingsToBottom(settingsWindow)
+                    }))
+                    steps.append((0.1, {
+                        snapshot(settingsWindow, name: "update-date-\(hasDate ? "saved" : "empty")-\(language)-\(theme)")
+                    }))
+                }
+            }
+        }
+        steps.append((0.1, {
+            settingsWindow.contentViewController = NSHostingController(rootView:
+                SettingsView(initialSection: .general)
+                    .environmentObject(delegate.langManager)
+                    .environmentObject(failedChecker)
+                    .environment(\.locale, Locale(identifier: "ru"))
+            )
+            Task { await failedChecker.checkForUpdates(includePrereleases: false) }
+        }))
+        steps.append((0.4, {
+            guard case .failed = failedChecker.state else { fatalError("Expected failed check") }
+            assert(UpdatePreferences().lastSuccessfulCheck == knownSuccess)
+            scrollSettingsToBottom(settingsWindow)
+        }))
+        steps.append((0.1, {
+            snapshot(settingsWindow, name: "update-date-preserved-after-failure")
+            print("Settings date and empty states rendered in RU/EN/DE and both themes; failure preserves success date")
+            settingsWindow.close()
+        }))
+        for theme in ["light", "dark"] {
+            for language in ["en", "ru", "de"] {
+                for interval in UpdateCheckInterval.allCases {
+                    steps.append((0.1, {
+                        overrideDefaults(["automaticUpdateChecks": true,
+                                          "lastAutomaticUpdateAttempt": Date(),
+                                          "automaticUpdateCheckInterval": interval.rawValue])
+                        settingsWindow.contentViewController = NSHostingController(rootView:
+                            SettingsView(initialSection: .general)
+                                .environmentObject(delegate.langManager)
+                                .environmentObject(delegate.updateChecker)
+                                .environment(\.locale, Locale(identifier: language))
+                                .preferredColorScheme(theme == "dark" ? .dark : .light)
+                        )
+                        settingsWindow.makeKeyAndOrderFront(nil)
+                    }))
+                    steps.append((0.3, { scrollSettingsToBottom(settingsWindow) }))
+                    steps.append((0.1, {
+                        assert(UpdatePreferences().checkInterval == interval)
+                        assert(!delegate.updateChecker.isChecking)
+                        snapshot(settingsWindow, name: "update-interval-\(interval.rawValue)-\(language)-\(theme)")
+                    }))
+                }
+            }
+        }
+        for raw in [21600.5, 3.5] {
+            steps.append((0.1, {
+                overrideDefaults(["automaticUpdateChecks": false])
+                // Launch arguments override persistent values, so corrupt the isolated app domain instead.
+                var arguments = UserDefaults.standard.volatileDomain(forName: UserDefaults.argumentDomain)
+                arguments.removeValue(forKey: "automaticUpdateCheckInterval")
+                UserDefaults.standard.setVolatileDomain(arguments, forName: UserDefaults.argumentDomain)
+                UserDefaults.standard.set(raw, forKey: "automaticUpdateCheckInterval")
+                settingsWindow.contentViewController = NSHostingController(rootView:
+                    SettingsView(initialSection: .general)
+                        .environmentObject(delegate.langManager)
+                        .environmentObject(delegate.updateChecker)
+                        .environment(\.locale, Locale(identifier: "ru"))
+                )
+                settingsWindow.makeKeyAndOrderFront(nil)
+            }))
+            steps.append((0.3, {
+                assert(UpdatePreferences().checkInterval == .daily)
+                assert(!UpdatePreferences().automaticChecksEnabled)
+                assert(UserDefaults.standard.object(forKey: "automaticUpdateCheckInterval") as? Int == 86400)
+                scrollSettingsToBottom(settingsWindow)
+            }))
+            steps.append((0.1, {
+                snapshot(settingsWindow, name: "update-interval-normalized-\(raw)")
+            }))
+        }
+        steps.append((0.1, {
+            overrideDefaults(["automaticUpdateChecks": false, "automaticUpdateCheckInterval": 86400])
+            settingsWindow.close()
+            print("Daily/weekly/monthly settings rendered in RU/EN/DE; invalid values normalized without enabling checks")
+        }))
         for tab in [1, 2] {
             steps.append((0.1, {
                 settingsWindow.contentViewController = NSHostingController(rootView:
@@ -529,6 +934,8 @@ struct PopoverSmokeTests {
             steps.append((0.3, { snapshot(settingsWindow, name: "appearance-tab-\(tab)") }))
         }
         steps.append((0.1, { settingsWindow.close() }))
+        steps.append(contentsOf: releaseNotesWindowSteps(for: delegate))
+        steps.append(contentsOf: releaseNotesSteps())
         schedule(steps)
         app.run()
     }

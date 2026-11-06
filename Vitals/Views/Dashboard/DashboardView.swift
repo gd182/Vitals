@@ -15,6 +15,7 @@ struct DashboardView: View {
     @State private var showingSettingsFor: BlockContent? = nil
     @State private var isEditing: Bool = false
     @Environment(\.openSettings) var openSettings
+    @EnvironmentObject private var updateChecker: UpdateChecker
     
     @AppStorage("panelWidth") private var panelWidth: Double = 360
     @AppStorage("panelCompact") private var compact = true
@@ -35,6 +36,20 @@ struct DashboardView: View {
             HStack(spacing: 8) {
                 Text(config.namespace).font(.system(size: compact ? 13 : 15, weight: .semibold))
                 Spacer()
+                if updateChecker.availableRelease != nil {
+                    Button {
+                        NotificationCenter.default.post(
+                            name: Notification.Name("VitalsShowReleaseNotes"),
+                            object: nil
+                        )
+                    } label: {
+                        Image(systemName: "arrow.down.circle")
+                            .foregroundStyle(.tint)
+                    }
+                    .buttonStyle(.plain)
+                    .help("updates_available")
+                    .accessibilityLabel("updates_available")
+                }
                 if isEditing {
                     Button {
                         config.reset(ids: blocks.map(\.id))

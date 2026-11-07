@@ -44,8 +44,181 @@ struct ProcessResizeProbeView: View {
     }
 }
 
+private struct RAMDetailsLayoutProbeView: View {
+    @ObservedObject var config: DashboardConfig
+
+    var body: some View {
+        DashboardView(blocks: [], config: config).blockView(for: .ramDetails)
+    }
+}
+
 @main
 struct PopoverSmokeTests {
+    @MainActor static func ramDetailsLayoutSteps() -> [(Double, @MainActor () -> Void)] {
+        let suite = "VitalsSmoke.RAMDetails.\(UUID())"
+        let defaults = UserDefaults(suiteName: suite)!
+        defaults.set(false, forKey: "ramShowSwap")
+        defaults.set(false, forKey: "ramShowMemoryPressure")
+        defaults.set("value", forKey: "ramIndicatorStyle")
+        defaults.set(false, forKey: "ramRepeatIndicatorValues")
+        let vm = SystemViewModel(defaults: defaults)
+        let config = DashboardConfig(namespace: "RAM", defaults: defaults)
+        let window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 360, height: 180),
+                              styleMask: [.titled], backing: .buffered, defer: false)
+        window.isReleasedWhenClosed = false
+        var singleRowHeight: CGFloat = 0
+        var threeRowHeight: CGFloat = 0
+        var savedArguments: [String: Any] = [:]
+        var steps: [(Double, @MainActor () -> Void)] = []
+        steps.append((0.1, {
+            // NSArgumentDomain is shared even by named defaults suites. Earlier smoke scenarios
+            // override these keys, so remove them while checking this isolated store.
+            savedArguments = UserDefaults.standard.volatileDomain(forName: UserDefaults.argumentDomain)
+            var arguments = savedArguments
+            for key in ["panelCompact", "ramShowSwap", "ramShowMemoryPressure", "ramIndicatorStyle",
+                        "ramRepeatIndicatorValues", "RAM.ram_indicators.visible",
+                        "cpuProcessVisibleRows", "ramProcessVisibleRows"] {
+                arguments.removeValue(forKey: key)
+            }
+            UserDefaults.standard.setVolatileDomain(arguments, forName: UserDefaults.argumentDomain)
+            for language in ["en", "ru", "de"] {
+                for theme in [ColorScheme.light, .dark] {
+                    for width: CGFloat in [328, 388] {
+                        for compact in [true, false] {
+                            defaults.set(compact, forKey: "panelCompact")
+                            var measured: [(Bool, CGFloat)] = []
+                            for style in [RAMIndicatorStyle.ring, .value] {
+                                for indicatorsVisible in [false, true] {
+                                    for repeated in [false, true] {
+                                        defaults.set(style.rawValue, forKey: "ramIndicatorStyle")
+                                        defaults.set(repeated, forKey: "ramRepeatIndicatorValues")
+                                        let view = NSHostingView(rootView:
+                                            RAMDetailsView(indicatorsVisible: indicatorsVisible)
+                                                .environmentObject(vm)
+                                                .defaultAppStorage(defaults)
+                                                .environment(\.locale, Locale(identifier: language))
+                                                .preferredColorScheme(theme)
+                                                .frame(width: width)
+                                        )
+                                        let size = view.fittingSize
+                                        assert(abs(size.width - width) < 1)
+                                        let showsAll = style == .ring || !indicatorsVisible || repeated
+                                        measured.append((showsAll, size.height))
+                                    }
+                                }
+                            }
+                            let single = measured.first(where: { !$0.0 })!.1
+                            let full = measured.first(where: { $0.0 })!.1
+                            assert(single > 0 && full > single)
+                            let spacing: CGFloat = compact ? 4 : 8
+                            assert(abs(full - (3 * single + 2 * spacing)) < 1,
+                                   "Exactly two rows must hide: single=\(single), full=\(full), compact=\(compact), language=\(language), width=\(width)")
+                            for (showsAll, height) in measured {
+                                assert(abs(height - (showsAll ? full : single)) < 1)
+                            }
+                        }
+                    }
+                }
+            }
+            defaults.set(true, forKey: "panelCompact")
+            defaults.set("value", forKey: "ramIndicatorStyle")
+            defaults.set(false, forKey: "ramRepeatIndicatorValues")
+            window.contentViewController = NSHostingController(rootView:
+                RAMDetailsLayoutProbeView(config: config)
+                    .environmentObject(vm)
+                    .defaultAppStorage(defaults)
+                    .environment(\.locale, Locale(identifier: "ru"))
+                    .frame(width: 328)
+                    .padding(16)
+            )
+            window.center()
+            window.makeKeyAndOrderFront(nil)
+        }))
+        steps.append((0.3, {
+            singleRowHeight = window.contentViewController!.view.fittingSize.height
+            snapshot(window, name: "ram-details-without-repeated-values")
+            defaults.set(true, forKey: "ramRepeatIndicatorValues")
+        }))
+        steps.append((0.3, {
+            threeRowHeight = window.contentViewController!.view.fittingSize.height
+            assert(threeRowHeight > singleRowHeight, "The preference must update an already open view")
+            defaults.set(false, forKey: "ramRepeatIndicatorValues")
+            config.setVisible(id: "ram_indicators", false)
+        }))
+        steps.append((0.3, {
+            assert(abs(window.contentViewController!.view.fittingSize.height - threeRowHeight) < 1,
+                   "Disabling indicators must return both detail rows through DashboardConfig")
+            snapshot(window, name: "ram-details-hidden-indicator-fallback")
+            config.setVisible(id: "ram_indicators", true)
+        }))
+        steps.append((0.3, {
+            assert(abs(window.contentViewController!.view.fittingSize.height - singleRowHeight) < 1)
+            defaults.set("ring", forKey: "ramIndicatorStyle")
+        }))
+        steps.append((0.3, {
+            assert(abs(window.contentViewController!.view.fittingSize.height - threeRowHeight) < 1,
+                   "Switching to a ring must return the byte values immediately")
+            window.close()
+        }))
+        for language in ["en", "ru", "de"] {
+            for theme in [ColorScheme.light, .dark] {
+                steps.append((0.1, {
+                    window.contentViewController = NSHostingController(rootView:
+                        AppearanceSettingsView()
+                            .defaultAppStorage(defaults)
+                            .environment(\.locale, Locale(identifier: language))
+                            .preferredColorScheme(theme)
+                    )
+                    window.setContentSize(NSSize(width: 520, height: 620))
+                    window.makeKeyAndOrderFront(nil)
+                }))
+                steps.append((0.2, { scrollSettingsToBottom(window) }))
+                steps.append((0.1, {
+                    snapshot(window, name: "ram-details-setting-\(language)-\(theme == .dark ? "dark" : "light")")
+                }))
+            }
+        }
+        steps.append((0.1, {
+            defaults.set("value", forKey: "ramIndicatorStyle")
+            defaults.set(false, forKey: "ramRepeatIndicatorValues")
+            defaults.set(3, forKey: "cpuProcessVisibleRows")
+            defaults.set(7, forKey: "ramProcessVisibleRows")
+            defaults.set(false, forKey: "RAM.ram_indicators.visible")
+        }))
+        steps.append((0.2, {
+            let view = window.contentView!
+            // Fixed 520x620 scrolled form: click the repetition switch in the RAM section.
+            let y = view.isFlipped ? view.bounds.maxY - 158 : view.bounds.minY + 158
+            click(NSPoint(x: 470, y: y), in: view)
+        }))
+        steps.append((0.2, {
+            assert(defaults.object(forKey: "ramRepeatIndicatorValues") as? Bool == true,
+                   "The actual settings toggle must write to the selected store")
+            defaults.set(false, forKey: "ramRepeatIndicatorValues")
+            let view = window.contentView!
+            let y = view.isFlipped ? view.bounds.maxY - 42 : view.bounds.minY + 42
+            click(NSPoint(x: 50, y: y), in: view)
+        }))
+        steps.append((0.2, {
+            assert(defaults.object(forKey: "ramRepeatIndicatorValues") as? Bool == true)
+            assert(defaults.string(forKey: "ramIndicatorStyle") == "ring")
+            assert(defaults.object(forKey: "ramShowSwap") as? Bool == true)
+            assert(defaults.object(forKey: "ramShowMemoryPressure") as? Bool == true)
+            assert(defaults.integer(forKey: "ramProcessVisibleRows") == ProcessListLayout.defaultVisibleRows)
+            assert(defaults.integer(forKey: "cpuProcessVisibleRows") == 3,
+                   "Resetting RAM must not change CPU preferences")
+            assert(defaults.object(forKey: "RAM.ram_indicators.visible") as? Bool == false,
+                   "The appearance reset must not change the dashboard block visibility")
+        }))
+        steps.append((0.1, {
+            window.close()
+            defaults.removePersistentDomain(forName: suite)
+            UserDefaults.standard.setVolatileDomain(savedArguments, forName: UserDefaults.argumentDomain)
+            print("RAM detail geometry, live preference/style/visibility changes, settings toggle and scoped reset passed in RU/EN/DE")
+        }))
+        return steps
+    }
+
     @MainActor static func releaseNotesWindowSteps(for delegate: AppDelegate) -> [(Double, @MainActor () -> Void)] {
         var firstWindow: NSWindow?
         var checkFinished = false
@@ -511,6 +684,11 @@ struct PopoverSmokeTests {
 
     @MainActor static func main() {
         let app = NSApplication.shared
+        if CommandLine.arguments.contains("--ram-details-only") {
+            schedule(ramDetailsLayoutSteps())
+            app.run()
+            return
+        }
         if CommandLine.arguments.contains("--release-notes-only") {
             schedule(releaseNotesSteps())
             app.run()
@@ -936,6 +1114,7 @@ struct PopoverSmokeTests {
         steps.append((0.1, { settingsWindow.close() }))
         steps.append(contentsOf: releaseNotesWindowSteps(for: delegate))
         steps.append(contentsOf: releaseNotesSteps())
+        steps.append(contentsOf: ramDetailsLayoutSteps())
         schedule(steps)
         app.run()
     }

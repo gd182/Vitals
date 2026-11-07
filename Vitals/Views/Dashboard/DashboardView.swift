@@ -148,7 +148,7 @@ struct DashboardView: View {
         case .gpuChartTiler(let namespace): ChartView(namespace: namespace, history: \.gpuTilerHistory, status: \.gpuTilerUtilizationState)
         case .gpuChartANE(let namespace): ChartView(namespace: namespace, history: \.gpuANEHistory, status: \.gpuANEUtilizationState)
         case .ramIndicators: RAMIndicatorsView()
-        case .ramDetails: RAMDetailsView()
+        case .ramDetails: RAMDetailsView(indicatorsVisible: config.isVisible(id: "ram_indicators"))
         case .ramChart(let namespace): ChartView(namespace: namespace, history: \.memoryHistory)
         case .ramProcesses: RAMProcessesView()
         }

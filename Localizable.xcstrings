@@ -2161,6 +2161,22 @@
         }
       }
     },
+    "ram_repeat_indicator_values" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "de" : { "stringUnit" : { "state" : "translated", "value" : "Belegten und gesamten Speicher in Details anzeigen" } },
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Show used and total memory in details" } },
+        "ru" : { "stringUnit" : { "state" : "translated", "value" : "Показывать занятый и полный объём в подробностях" } }
+      }
+    },
+    "ram_repeat_indicator_values_help" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "de" : { "stringUnit" : { "state" : "translated", "value" : "Diese Werte erscheinen auch in der numerischen Anzeige. Ist die Anzeige ausgeblendet oder als Ring dargestellt, bleiben die Detailzeilen sichtbar." } },
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "These values also appear in the numeric indicator. When the indicator is hidden or uses a ring, the detail rows remain visible." } },
+        "ru" : { "stringUnit" : { "state" : "translated", "value" : "В числовом режиме эти объёмы уже показаны в индикаторе. Если индикатор скрыт или выбран круговой режим, строки в подробностях остаются видимыми." } }
+      }
+    },
     "ram_indicator_style" : {
       "extractionState" : "manual",
       "localizations" : {

@@ -16,6 +16,20 @@ private struct RAMIndicatorPreferencesProbe {
 }
 
 @MainActor
+private struct RAMDetailRepetitionProbe {
+    @AppStorage private var repeatValues: Bool
+
+    init(defaults: UserDefaults) {
+        _repeatValues = AppStorage(wrappedValue: true, "ramRepeatIndicatorValues", store: defaults)
+    }
+
+    var enabled: Bool {
+        get { repeatValues }
+        nonmutating set { repeatValues = newValue }
+    }
+}
+
+@MainActor
 private struct ProcessRowsPreferencesProbe {
     @AppStorage private var storedRows: Int
 
@@ -60,8 +74,31 @@ struct SettingsPreferencesTests {
         layout.reset(ids: ["a", "b", "d"])
         assert(layout.order == ["a", "b", "d"] && layout.isVisible(id: "b"))
         testRAMIndicatorStyle()
+        testRAMDetailRepetition()
         testProcessRows()
         print("Menu-bar preferences and accessibility fallback checks passed")
+    }
+
+    @MainActor private static func testRAMDetailRepetition() {
+        let suite = "VitalsRAMDetailRepetitionTests.\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: suite)!
+        defer { defaults.removePersistentDomain(forName: suite) }
+        let writer = RAMDetailRepetitionProbe(defaults: defaults)
+        assert(writer.enabled, "Existing installations keep their current detail rows by default")
+        defaults.set(3, forKey: "cpuProcessVisibleRows")
+        defaults.set(false, forKey: "RAM.ram_indicators.visible")
+        defaults.set("value", forKey: "ramIndicatorStyle")
+        for enabled in [false, true, false] {
+            writer.enabled = enabled
+            let reopenedDefaults = UserDefaults(suiteName: suite)!
+            assert(RAMDetailRepetitionProbe(defaults: reopenedDefaults).enabled == enabled)
+            assert(reopenedDefaults.integer(forKey: "cpuProcessVisibleRows") == 3)
+            assert(reopenedDefaults.object(forKey: "RAM.ram_indicators.visible") as? Bool == false)
+            assert(reopenedDefaults.string(forKey: "ramIndicatorStyle") == "value")
+        }
+        defaults.removeObject(forKey: "ramRepeatIndicatorValues")
+        assert(RAMDetailRepetitionProbe(defaults: defaults).enabled)
+        print("RAM detail repetition defaults, persistence and preference independence passed")
     }
 
     @MainActor private static func testProcessRows() {

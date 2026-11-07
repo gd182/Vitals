@@ -25,6 +25,11 @@ xcrun clang++ "${cxx_flags[@]}" -O2 -fobjc-arc -I Vitals/Core -I Vitals/Bridge \
 "$check_dir/gpu-stats-tests"
 
 xcrun swiftc -swift-version 5 -Onone -module-cache-path "$check_dir/swift-cache" \
+    Tests/RAMDetailsLayoutTests.swift Vitals/Models/RAMDetailsLayout.swift \
+    Vitals/Models/RAMIndicatorStyle.swift -o "$check_dir/ram-details-layout-tests"
+"$check_dir/ram-details-layout-tests"
+
+xcrun swiftc -swift-version 5 -Onone -module-cache-path "$check_dir/swift-cache" \
     Tests/MetricHelpTests.swift Vitals/Models/MetricHelpTopic.swift \
     -o "$check_dir/metric-help-tests"
 "$check_dir/metric-help-tests" Localizable.xcstrings

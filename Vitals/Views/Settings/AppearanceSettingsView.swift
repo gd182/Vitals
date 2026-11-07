@@ -9,6 +9,7 @@ struct AppearanceSettingsView: View {
     @AppStorage("chartFill") private var chartFill = true
     @AppStorage("ramShowSwap") private var showSwap = true
     @AppStorage("ramShowMemoryPressure") private var showMemoryPressure = true
+    @AppStorage("ramRepeatIndicatorValues") private var repeatIndicatorValues = true
     @AppStorage("ramIndicatorStyle")
         private var ramIndicatorStyle: RAMIndicatorStyle = .ring
     @AppStorage("cpuProcessVisibleRows") private var cpuProcessRows = ProcessListLayout.defaultVisibleRows
@@ -64,12 +65,15 @@ struct AppearanceSettingsView: View {
                         Text("ram_indicator_value")
                             .tag(RAMIndicatorStyle.value)
                     }
+                    Toggle("ram_repeat_indicator_values", isOn: $repeatIndicatorValues)
+                        .help("ram_repeat_indicator_values_help")
                     Toggle("memory_swap_used", isOn: $showSwap)
                     Toggle("memory_pressure", isOn: $showMemoryPressure)
                     Button {
                             showSwap = true
                             showMemoryPressure = true
                             ramIndicatorStyle = .ring
+                            repeatIndicatorValues = true
                             ramProcessRows = ProcessListLayout.defaultVisibleRows
                         } label: { Image(systemName: "arrow.counterclockwise") }
                         .help("panel_reset")

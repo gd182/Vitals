@@ -12,23 +12,42 @@ struct RAMDetailsView: View {
     @AppStorage("panelCompact") private var compact = true
     @AppStorage("ramShowSwap") private var showSwap = true
     @AppStorage("ramShowMemoryPressure") private var showMemoryPressure = true
+    let indicatorsVisible: Bool
+
+    @AppStorage("ramIndicatorStyle")
+    private var indicatorStyle: RAMIndicatorStyle = .ring
+
+    @AppStorage("ramRepeatIndicatorValues")
+    private var repeatIndicatorValues = true
+
+    private var showsUsedAndTotal: Bool {
+        RAMDetailsLayout.showsUsedAndTotal(
+            indicatorStyle: indicatorStyle,
+            indicatorsVisible: indicatorsVisible,
+            repeatIndicatorValues: repeatIndicatorValues
+        )
+    }
     
     var body: some View {
         VStack(alignment: .leading, spacing: compact ? 4 : 8) {
-            HStack {
-                Text("memory_used")
-                Spacer()
-                Text(Format.formatBytes(vm.memoryUsedBytes))
+            if showsUsedAndTotal {
+                HStack {
+                    Text("memory_used")
+                    Spacer()
+                    Text(Format.formatBytes(vm.memoryUsedBytes))
+                }
             }
             HStack {
                 Text("memory_free")
                 Spacer()
                 Text(Format.formatBytes(vm.memoryTotalBytes - vm.memoryUsedBytes))
             }
-            HStack {
-                Text("memory_total")
-                Spacer()
-                Text(Format.formatBytes(vm.memoryTotalBytes))
+            if showsUsedAndTotal {
+                HStack {
+                    Text("memory_total")
+                    Spacer()
+                    Text(Format.formatBytes(vm.memoryTotalBytes))
+                }
             }
             if showSwap {
                 HStack {
